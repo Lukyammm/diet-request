@@ -518,6 +518,7 @@ function onLock(){
       '<div class="field"><label for="l_user">Login</label><input id="l_user" autocomplete="username"></div>'+
       '<div class="field"><label for="l_pass">Senha</label><input id="l_pass" type="password" autocomplete="current-password"></div>'+
       '<p class="muted small">Área da equipe de nutrição e administração.</p>'+
+      '<p class="muted small"><b>Primeiro acesso:</b> use seu login também como senha. Você poderá trocá-la no primeiro login.</p>'+
     '</div>'+
     '<div class="mf"><button class="btn block" id="l_go">Entrar</button></div>');
   $('#l_pass').onkeydown=function(e){ if(e.key==='Enter')$('#l_go').click(); };
@@ -865,7 +866,7 @@ function formUsu(i){
         '<div class="field"><label for="u_perfil">Perfil</label><select id="u_perfil"><option'+(u.perfil!=='ADMIN'?' selected':'')+'>NUTRICAO</option><option'+(u.perfil==='ADMIN'?' selected':'')+'>ADMIN</option></select></div>'+
       '</div>'+
       '<div class="grid2">'+
-        '<div class="field"><label for="u_senha">'+(u.id?'Nova senha':'Senha inicial')+' <span class="hint">'+(u.id?'vazio = manter':'vazio = dieta@2026')+'</span></label><input id="u_senha"></div>'+
+        '<div class="field"><label for="u_senha">'+(u.id?'Nova senha':'Senha inicial')+' <span class="hint">'+(u.id?'vazio = manter':'vazio = usar o login como senha')+'</span></label><input id="u_senha"></div>'+
         '<div class="field"><label for="u_ativo">Ativo</label><select id="u_ativo"><option'+(u.ativo!==false?' selected':'')+'>SIM</option><option'+(u.ativo===false?' selected':'')+'>NÃO</option></select></div>'+
       '</div>'+
       '<p class="muted small">A senha definida aqui exige troca no primeiro login do usuário.</p>'+
