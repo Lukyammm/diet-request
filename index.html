@@ -173,8 +173,12 @@ hr.sep{border:0;border-top:1px solid var(--line);margin:16px 0}
 .ltag{display:inline-flex;align-items:center;gap:7px;background:var(--pri-s);color:var(--pri-d);border-radius:999px;padding:6px 6px 6px 13px;font-size:13.5px;font-weight:600}
 .ltag button{border:0;background:rgba(10,90,70,.14);color:inherit;width:19px;height:19px;border-radius:50%;display:grid;place-items:center;font-size:11px;line-height:1;padding:0;flex:0 0 auto}
 .ltag button:hover{background:var(--red);color:#fff}
+.ltag button.confirm{background:var(--red);color:#fff;animation:pulse 1s ease-in-out infinite}
 .laddrow{display:flex;gap:8px}
 .laddrow input{flex:1;min-width:0}
+.toast-a{display:flex;align-items:center;gap:12px}
+.toast-a .tbtn{background:rgba(255,255,255,.16);border:0;color:#fff;border-radius:8px;padding:6px 12px;font-size:13px;font-weight:600;flex:0 0 auto}
+.toast-a .tbtn:hover{background:rgba(255,255,255,.3)}
 
 /* ---------- painel TV ---------- */
 body.tv{background:#0f1512;color:#e8efe9}
@@ -259,6 +263,16 @@ function toast(msg,err){
   t.className='toast'+(err?' err':''); t.textContent=msg;
   $('#toasts').appendChild(t);
   setTimeout(function(){ t.remove(); }, 3800);
+}
+function toastAction(msg,actionLabel,fn,ms){
+  var t=document.createElement('div');
+  t.className='toast toast-a';
+  var span=document.createElement('span'); span.className='grow'; span.textContent=msg;
+  var btn=document.createElement('button'); btn.type='button'; btn.className='tbtn'; btn.textContent=actionLabel;
+  t.appendChild(span); t.appendChild(btn);
+  $('#toasts').appendChild(t);
+  var to=setTimeout(function(){ t.remove(); }, ms||6000);
+  btn.onclick=function(){ clearTimeout(to); t.remove(); fn(); };
 }
 function busy(btn,on,label){
   if(!btn)return;
@@ -595,7 +609,7 @@ function showApp(){
   $('#v-app').classList.remove('hide');
   var admin=S.user&&S.user.perfil==='ADMIN';
   var tabs=[['pend','Pendências'],['hist','Histórico'],['rel','Relatórios']];
-  if(admin) tabs.push(['listas','Listas'],['usu','Usuários']);
+  if(admin) tabs.push(['listas','Listas'],['usu','Usuários'],['aud','Auditoria']);
   $('#v-app').innerHTML=
     '<div class="appbar">'+
       '<h2 id="apptitle">Pendências</h2>'+
@@ -614,7 +628,7 @@ function showApp(){
 function setTab(t){
   S.tab=t; clearTimers();
   $$('#tabs button').forEach(function(b){ b.classList.toggle('on',b.dataset.t===t); });
-  var titles={pend:'Pendências',hist:'Histórico',rel:'Relatórios',listas:'Listas do sistema',usu:'Usuários'};
+  var titles={pend:'Pendências',hist:'Histórico',rel:'Relatórios',listas:'Listas do sistema',usu:'Usuários',aud:'Auditoria'};
   $('#apptitle').textContent=titles[t];
   var body=$('#appbody');
   body.innerHTML='<div class="empty"><span class="spin" style="border-color:var(--line);border-top-color:var(--pri)"></span></div>';
@@ -623,6 +637,7 @@ function setTab(t){
   if(t==='rel') viewRel();
   if(t==='listas') viewListas();
   if(t==='usu') viewUsu();
+  if(t==='aud') viewAuditoria();
 }
 
 function authGuard(r){
@@ -834,7 +849,7 @@ function listaCardHtml(t){
   return '<div class="card pad" data-listacard="'+t+'"><h3 style="font-size:15px;margin-bottom:4px">'+LNOMES[t]+'</h3>'+
     '<p class="muted small mb">'+itens.length+' '+(itens.length===1?'item cadastrado':'itens cadastrados')+'</p>'+
     '<div class="ltags">'+(itens.length?itens.map(function(v,i){
-      return '<span class="ltag">'+esc(v)+'<button type="button" title="Remover" aria-label="Remover '+esc(v)+'" onclick="removerItemLista(\''+t+'\','+i+')">✕</button></span>';
+      return '<span class="ltag">'+esc(v)+'<button type="button" title="Remover (clique 2x para confirmar)" aria-label="Remover '+esc(v)+'" onclick="removerItemLista(\''+t+'\','+i+',this)">✕</button></span>';
     }).join(''):'<span class="muted small">Nenhum item cadastrado ainda.</span>')+'</div>'+
     '<div class="laddrow"><input placeholder="Novo item…" data-ladd="'+t+'" onkeydown="if(event.key===\'Enter\'){event.preventDefault();adicionarItemLista(\''+t+'\')}">'+
     '<button class="btn sm" type="button" onclick="adicionarItemLista(\''+t+'\')">Adicionar</button></div></div>';
@@ -851,17 +866,59 @@ function adicionarItemLista(t){
   if(atuais.some(function(x){return x.toLowerCase()===v.toLowerCase();})){ toast('Esse item já existe na lista.',true); return; }
   salvarListaCompleta(t,atuais.concat([v.toUpperCase()]));
 }
-function removerItemLista(t,i){
-  var novos=(LISTAS_ST[t]||[]).slice();
-  novos.splice(i,1);
-  salvarListaCompleta(t,novos);
+var LDEL_CONFIRM=null;
+function removerItemLista(t,i,btn){
+  var key=t+'|'+i;
+  if(LDEL_CONFIRM && LDEL_CONFIRM.key===key){
+    clearTimeout(LDEL_CONFIRM.to); LDEL_CONFIRM=null;
+    var novos=(LISTAS_ST[t]||[]).slice();
+    var removido=novos.splice(i,1)[0];
+    salvarListaCompleta(t,novos,function(){
+      toastAction('Item removido: "'+removido+'".','Desfazer',function(){
+        salvarListaCompleta(t,(LISTAS_ST[t]||[]).concat([removido]));
+      });
+    });
+    return;
+  }
+  if(LDEL_CONFIRM) refreshListaCard(LDEL_CONFIRM.t);
+  LDEL_CONFIRM={t:t,i:i,key:key,to:setTimeout(function(){ LDEL_CONFIRM=null; refreshListaCard(t); },3000)};
+  if(btn){ btn.textContent='!'; btn.classList.add('confirm'); }
 }
-function salvarListaCompleta(t,novos){
+function salvarListaCompleta(t,novos,onOk){
   rpc('apiSalvarLista',S.token,t,novos).then(function(r){
     if(!r.ok){ toast(r.erro,true); return; }
     LISTAS_ST[t]=novos;
     refreshListaCard(t);
-    toast(LNOMES[t]+' atualizada.');
+    if(onOk) onOk(); else toast(LNOMES[t]+' atualizada.');
+  });
+}
+
+/* ---------- admin: auditoria ---------- */
+function viewAuditoria(){
+  $('#appbody').innerHTML=
+    '<div class="row mb"><input id="aud_busca" placeholder="Buscar por usuário, ação ou detalhe…" style="flex:1;min-width:220px" oninput="buscaAuditoriaDebounced()">'+
+    '<button class="btn ghost sm" onclick="carregarAuditoria()">Atualizar</button></div>'+
+    '<div id="aud_list"></div>';
+  carregarAuditoria();
+}
+var AUD_TO=null;
+function buscaAuditoriaDebounced(){
+  clearTimeout(AUD_TO);
+  AUD_TO=setTimeout(carregarAuditoria,350);
+}
+function carregarAuditoria(){
+  var busca=($('#aud_busca')&&$('#aud_busca').value)||'';
+  rpc('apiAuditoria',S.token,busca).then(function(r){
+    if(!authGuard(r))return;
+    var host=$('#aud_list');
+    if(!host)return;
+    if(!r.itens.length){ host.innerHTML='<div class="card empty"><b>Nada por aqui</b>Nenhum registro encontrado.</div>'; return; }
+    host.innerHTML='<div class="card tblwrap"><table class="tbl"><thead><tr><th>Quando</th><th>Usuário</th><th>Ação</th><th>Detalhe</th></tr></thead><tbody>'+
+      r.itens.map(function(x){
+        return '<tr><td style="white-space:nowrap">'+fmtDT(x.dataHora)+'</td>'+
+          '<td>'+esc(x.usuario)+(x.login?' <span class="muted small">('+esc(x.login)+')</span>':'')+'</td>'+
+          '<td>'+esc(x.acao)+'</td><td>'+esc(x.detalhe)+'</td></tr>';
+      }).join('')+'</tbody></table></div>';
   });
 }
 function salvarSla(){
