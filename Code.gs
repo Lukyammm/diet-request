@@ -142,17 +142,32 @@ function rowsAsObjects_(sh, headers) {
   });
 }
 
+/* Cache de curta duração para reduzir leituras concorrentes da planilha
+   (várias abas/usuários batendo no mesmo doGet/API ao mesmo tempo). */
+function cacheGetJson_(key) {
+  var v = CacheService.getScriptCache().get(key);
+  return v ? JSON.parse(v) : null;
+}
+function cachePutJson_(key, obj, ttlSec) {
+  try { CacheService.getScriptCache().put(key, JSON.stringify(obj), ttlSec); } catch (e) { /* valor grande demais p/ cache: ignora */ }
+}
+function cacheInvalidate_(key) { CacheService.getScriptCache().remove(key); }
+
 function listas_() {
+  var cached = cacheGetJson_('listas');
+  if (cached) return cached;
   var sh = sheet_(SH.LIS);
   var out = {};
   var last = sh.getLastRow();
-  if (last < 2) return out;
-  sh.getRange(2, 1, last - 1, 2).getValues().forEach(function (r) {
-    var tipo = s_(r[0]), val = s_(r[1]);
-    if (!tipo || !val) return;
-    if (!out[tipo]) out[tipo] = [];
-    out[tipo].push(val);
-  });
+  if (last >= 2) {
+    sh.getRange(2, 1, last - 1, 2).getValues().forEach(function (r) {
+      var tipo = s_(r[0]), val = s_(r[1]);
+      if (!tipo || !val) return;
+      if (!out[tipo]) out[tipo] = [];
+      out[tipo].push(val);
+    });
+  }
+  cachePutJson_('listas', out, 30);
   return out;
 }
 
@@ -197,7 +212,13 @@ function login(loginName, senha) {
     if (hash_(senha, u.SALT) !== u.HASH) { audit_(u, 'LOGIN_FALHA', 'Senha incorreta.'); return { ok: false, erro: 'Login ou senha incorretos.' }; }
     var token = Utilities.getUuid();
     var exp = Date.now() + 12 * 3600 * 1000;
-    sh.getRange(u._row, 9, 1, 2).setValues([[token, String(exp)]]);
+    var lock = LockService.getScriptLock();
+    lock.waitLock(20000);
+    try {
+      sh.getRange(u._row, 9, 1, 2).setValues([[token, String(exp)]]);
+    } finally {
+      lock.releaseLock();
+    }
     audit_(u, 'LOGIN', 'Login realizado.');
     return { ok: true, token: token, nome: u.NOME, perfil: u.PERFIL, primeiroAcesso: u.PRIMEIRO_ACESSO === 'SIM' };
   }
@@ -234,8 +255,15 @@ function trocarSenha(token, nova) {
   nova = s_(nova);
   if (nova.length < 6) return { ok: false, erro: 'A nova senha precisa de pelo menos 6 caracteres.' };
   var salt = Utilities.getUuid();
-  sheet_(SH.USU).getRange(u._row, 4, 1, 2).setValues([[hash_(nova, salt), salt]]);
-  sheet_(SH.USU).getRange(u._row, 8).setValue('NÃO');
+  var lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    var sh = sheet_(SH.USU);
+    sh.getRange(u._row, 4, 1, 2).setValues([[hash_(nova, salt), salt]]);
+    sh.getRange(u._row, 8).setValue('NÃO');
+  } finally {
+    lock.releaseLock();
+  }
   audit_(u, 'TROCA_SENHA', 'Senha alterada pelo próprio usuário.');
   return { ok: true };
 }
@@ -300,6 +328,7 @@ function pubCriar(o) {
       ];
       sheet_(SH.SOL).appendRow(row);
       audit_(null, 'SOLICITACAO_CRIADA', 'ID ' + id + ' — ' + s_(o.paciente).toUpperCase() + ' (' + s_(o.tipo) + ') por ' + s_(o.profissional).toUpperCase() + '.');
+      cacheInvalidate_('painel');
       return { ok: true, id: id };
     } finally {
       lock.releaseLock();
@@ -310,6 +339,10 @@ function pubCriar(o) {
 }
 
 function pubPainel() {
+  /* Painel de TV é consultado em polling por vários telões ao mesmo tempo;
+     cache curtíssimo evita reler a planilha inteira a cada requisição. */
+  var cached = cacheGetJson_('painel');
+  if (cached) { cached.agora = nowIso_(); return cached; }
   var all = rowsAsObjects_(sheet_(SH.SOL), SOL_HEADERS);
   var hoje = new Date().toISOString().slice(0, 10);
   var pend = [], recentes = [], stats = { total: 0, pendentes: 0, atendidas: 0, recusadas: 0 };
@@ -331,7 +364,9 @@ function pubPainel() {
 
   pend.sort(function (a, b) { return a.criadoEm < b.criadoEm ? -1 : 1; });
   recentes.sort(function (a, b) { return a.resolvidoEm > b.resolvidoEm ? -1 : 1; });
-  return { ok: true, pendentes: pend, recentes: recentes.slice(0, 8), stats: stats, slaMin: slaMin_(), agora: nowIso_() };
+  var out = { ok: true, pendentes: pend, recentes: recentes.slice(0, 8), stats: stats, slaMin: slaMin_(), agora: nowIso_() };
+  cachePutJson_('painel', out, 5);
+  return out;
 }
 
 /* ======================= OPERAÇÃO (LOGIN) ======================= */
@@ -379,6 +414,7 @@ function apiResolver(token, o) {
       ]]);
       audit_(u, analise === 'ACEITA' ? 'SOLICITACAO_ACEITA' : 'SOLICITACAO_RECUSADA',
         'ID ' + r.ID + ' — ' + r.PACIENTE + (analise === 'RECUSADA' ? ' — motivo: ' + s_(o.motivoRecusa) : '') + '.');
+      cacheInvalidate_('painel');
       return { ok: true };
     }
     return { ok: false, erro: 'Solicitação não encontrada.' };
@@ -460,38 +496,44 @@ function apiSalvarUsuario(token, o) {
   o = o || {};
   var nome = s_(o.nome).toUpperCase(), loginName = s_(o.login).toLowerCase(), perfil = s_(o.perfil) === 'ADMIN' ? 'ADMIN' : 'NUTRICAO';
   if (!nome || !loginName) return { ok: false, erro: 'Nome e login são obrigatórios.' };
-  var sh = sheet_(SH.USU);
-  var users = rowsAsObjects_(sh, USU_HEADERS);
+  var lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    var sh = sheet_(SH.USU);
+    var users = rowsAsObjects_(sh, USU_HEADERS);
 
-  if (o.id) {
-    for (var i = 0; i < users.length; i++) {
-      var u = users[i];
-      if (u.ID !== s_(o.id)) continue;
-      if (u.ID === adm.ID && o.ativo === false) return { ok: false, erro: 'Você não pode desativar o próprio usuário.' };
-      sh.getRange(u._row, 2).setValue(nome);
-      sh.getRange(u._row, 6, 1, 2).setValues([[perfil, o.ativo === false ? 'NÃO' : 'SIM']]);
-      audit_(adm, 'USUARIO_EDITADO', 'Usuário ' + u.LOGIN + ' (' + nome + ') — perfil ' + perfil + ', ativo ' + (o.ativo === false ? 'NÃO' : 'SIM') + '.');
-      if (s_(o.senha)) {
-        var salt = Utilities.getUuid();
-        sh.getRange(u._row, 4, 1, 2).setValues([[hash_(s_(o.senha), salt), salt]]);
-        sh.getRange(u._row, 8).setValue('SIM');
-        sh.getRange(u._row, 9, 1, 2).setValues([['', '']]);
-        audit_(adm, 'SENHA_REDEFINIDA', 'Senha do usuário ' + u.LOGIN + ' redefinida pelo administrador.');
+    if (o.id) {
+      for (var i = 0; i < users.length; i++) {
+        var u = users[i];
+        if (u.ID !== s_(o.id)) continue;
+        if (u.ID === adm.ID && o.ativo === false) return { ok: false, erro: 'Você não pode desativar o próprio usuário.' };
+        sh.getRange(u._row, 2).setValue(nome);
+        sh.getRange(u._row, 6, 1, 2).setValues([[perfil, o.ativo === false ? 'NÃO' : 'SIM']]);
+        audit_(adm, 'USUARIO_EDITADO', 'Usuário ' + u.LOGIN + ' (' + nome + ') — perfil ' + perfil + ', ativo ' + (o.ativo === false ? 'NÃO' : 'SIM') + '.');
+        if (s_(o.senha)) {
+          var salt = Utilities.getUuid();
+          sh.getRange(u._row, 4, 1, 2).setValues([[hash_(s_(o.senha), salt), salt]]);
+          sh.getRange(u._row, 8).setValue('SIM');
+          sh.getRange(u._row, 9, 1, 2).setValues([['', '']]);
+          audit_(adm, 'SENHA_REDEFINIDA', 'Senha do usuário ' + u.LOGIN + ' redefinida pelo administrador.');
+        }
+        return { ok: true };
       }
-      return { ok: true };
+      return { ok: false, erro: 'Usuário não encontrado.' };
     }
-    return { ok: false, erro: 'Usuário não encontrado.' };
-  }
 
-  for (var j = 0; j < users.length; j++) {
-    if (users[j].LOGIN.toLowerCase() === loginName) return { ok: false, erro: 'Este login já existe.' };
+    for (var j = 0; j < users.length; j++) {
+      if (users[j].LOGIN.toLowerCase() === loginName) return { ok: false, erro: 'Este login já existe.' };
+    }
+    var senha = s_(o.senha) || loginName;
+    var salt2 = Utilities.getUuid();
+    var id = 'U' + (users.length + 1) + '-' + Date.now().toString(36);
+    sh.appendRow([id, nome, loginName, hash_(senha, salt2), salt2, perfil, 'SIM', 'SIM', '', '']);
+    audit_(adm, 'USUARIO_CRIADO', 'Usuário criado: ' + loginName + ' (' + nome + '), perfil ' + perfil + '.');
+    return { ok: true };
+  } finally {
+    lock.releaseLock();
   }
-  var senha = s_(o.senha) || loginName;
-  var salt2 = Utilities.getUuid();
-  var id = 'U' + (users.length + 1) + '-' + Date.now().toString(36);
-  sh.appendRow([id, nome, loginName, hash_(senha, salt2), salt2, perfil, 'SIM', 'SIM', '', '']);
-  audit_(adm, 'USUARIO_CRIADO', 'Usuário criado: ' + loginName + ' (' + nome + '), perfil ' + perfil + '.');
-  return { ok: true };
 }
 
 var LISTAS_EDITAVEIS = ['CLINICA', 'CATEGORIA', 'MOTIVO_SUSPENSAO', 'MAMADEIRA', 'CONSISTENCIA', 'MOTIVO_RECUSA'];
@@ -537,6 +579,7 @@ function apiSalvarLista(token, tipo, valores) {
 
     adicionados.forEach(function (v) { audit_(adm, 'LISTA_ITEM_ADICIONADO', LNOMES_[tipo] + ': "' + v + '".'); });
     removidos.forEach(function (v) { audit_(adm, 'LISTA_ITEM_REMOVIDO', LNOMES_[tipo] + ': "' + v + '".'); });
+    cacheInvalidate_('listas');
     return { ok: true };
   } finally {
     lock.releaseLock();
@@ -550,19 +593,29 @@ function apiSalvarSla(token, minutos) {
   if (!adm) return { ok: false, erro: 'Apenas administradores.' };
   var n = parseInt(minutos, 10);
   if (!(n > 0 && n <= 720)) return { ok: false, erro: 'Informe um SLA entre 1 e 720 minutos.' };
-  var sh = sheet_(SH.LIS);
-  var last = sh.getLastRow();
-  var anterior = slaMin_();
-  for (var i = 2; i <= last; i++) {
-    if (s_(sh.getRange(i, 1).getValue()) === 'CONFIG' && /^SLA_MINUTOS/i.test(s_(sh.getRange(i, 2).getValue()))) {
-      sh.getRange(i, 2).setValue('SLA_MINUTOS=' + n);
-      audit_(adm, 'SLA_ALTERADO', 'SLA alterado de ' + anterior + ' para ' + n + ' minutos.');
-      return { ok: true };
+
+  var lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    var sh = sheet_(SH.LIS);
+    var last = sh.getLastRow();
+    var anterior = slaMin_();
+    var rows = last >= 2 ? sh.getRange(2, 1, last - 1, 2).getValues() : [];
+    for (var i = 0; i < rows.length; i++) {
+      if (s_(rows[i][0]) === 'CONFIG' && /^SLA_MINUTOS/i.test(s_(rows[i][1]))) {
+        sh.getRange(i + 2, 2).setValue('SLA_MINUTOS=' + n);
+        audit_(adm, 'SLA_ALTERADO', 'SLA alterado de ' + anterior + ' para ' + n + ' minutos.');
+        cacheInvalidate_('listas');
+        return { ok: true };
+      }
     }
+    sh.appendRow(['CONFIG', 'SLA_MINUTOS=' + n]);
+    audit_(adm, 'SLA_ALTERADO', 'SLA alterado de ' + anterior + ' para ' + n + ' minutos.');
+    cacheInvalidate_('listas');
+    return { ok: true };
+  } finally {
+    lock.releaseLock();
   }
-  sh.appendRow(['CONFIG', 'SLA_MINUTOS=' + n]);
-  audit_(adm, 'SLA_ALTERADO', 'SLA alterado de ' + anterior + ' para ' + n + ' minutos.');
-  return { ok: true };
 }
 
 function apiAuditoria(token, busca) {
