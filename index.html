@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;600;700&family=Instrument+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
 <style>
 :root{
   --ink:#1d2a24; --paper:#f4f6f3; --card:#ffffff; --line:#e0e6e0; --mut:#68766e;
@@ -12,7 +12,7 @@
   --red:#b3402e; --red-s:#f7e8e5; --amber:#a06e12; --amber-s:#f7efdd;
   --blue:#2b6cb0; --blue-s:#e6eef7; --purple:#6b4fa3; --purple-s:#eee9f6;
   --r:12px; --sh:0 1px 2px rgba(29,42,36,.06),0 4px 14px rgba(29,42,36,.05);
-  --disp:'Bricolage Grotesque',system-ui,sans-serif; --body:'Instrument Sans',system-ui,sans-serif;
+  --disp:'Inter',system-ui,sans-serif; --body:'Inter',system-ui,sans-serif;
   --mono:ui-monospace,'SF Mono',Menlo,Consolas,monospace;
 }
 *{box-sizing:border-box;margin:0;padding:0}
@@ -176,6 +176,8 @@ hr.sep{border:0;border-top:1px solid var(--line);margin:16px 0}
 .ltag button.confirm{background:var(--red);color:#fff;animation:pulse 1s ease-in-out infinite}
 .laddrow{display:flex;gap:8px}
 .laddrow input{flex:1;min-width:0}
+.inp{border:1px solid var(--line);border-radius:10px;padding:11px 12px;background:#fff;transition:border-color .15s}
+.inp:focus{border-color:var(--pri);outline:none;box-shadow:0 0 0 3px rgba(14,122,95,.12)}
 .toast-a{display:flex;align-items:center;gap:12px}
 .toast-a .tbtn{background:rgba(255,255,255,.16);border:0;color:#fff;border-radius:8px;padding:6px 12px;font-size:13px;font-weight:600;flex:0 0 auto}
 .toast-a .tbtn:hover{background:rgba(255,255,255,.3)}
@@ -851,7 +853,7 @@ function listaCardHtml(t){
     '<div class="ltags">'+(itens.length?itens.map(function(v,i){
       return '<span class="ltag">'+esc(v)+'<button type="button" title="Remover (clique 2x para confirmar)" aria-label="Remover '+esc(v)+'" onclick="removerItemLista(\''+t+'\','+i+',this)">✕</button></span>';
     }).join(''):'<span class="muted small">Nenhum item cadastrado ainda.</span>')+'</div>'+
-    '<div class="laddrow"><input placeholder="Novo item…" data-ladd="'+t+'" onkeydown="if(event.key===\'Enter\'){event.preventDefault();adicionarItemLista(\''+t+'\')}">'+
+    '<div class="laddrow"><input class="inp" placeholder="Novo item…" data-ladd="'+t+'" onkeydown="if(event.key===\'Enter\'){event.preventDefault();adicionarItemLista(\''+t+'\')}">'+
     '<button class="btn sm" type="button" onclick="adicionarItemLista(\''+t+'\')">Adicionar</button></div></div>';
 }
 function refreshListaCard(t){
@@ -896,7 +898,7 @@ function salvarListaCompleta(t,novos,onOk){
 /* ---------- admin: auditoria ---------- */
 function viewAuditoria(){
   $('#appbody').innerHTML=
-    '<div class="row mb"><input id="aud_busca" placeholder="Buscar por usuário, ação ou detalhe…" style="flex:1;min-width:220px" oninput="buscaAuditoriaDebounced()">'+
+    '<div class="row mb"><input id="aud_busca" class="inp" placeholder="Buscar por usuário, ação ou detalhe…" style="flex:1;min-width:220px" oninput="buscaAuditoriaDebounced()">'+
     '<button class="btn ghost sm" onclick="carregarAuditoria()">Atualizar</button></div>'+
     '<div id="aud_list"></div>';
   carregarAuditoria();
