@@ -168,6 +168,14 @@ hr.sep{border:0;border-top:1px solid var(--line);margin:16px 0}
 .toast{background:var(--ink);color:#fff;border-radius:12px;padding:12px 16px;font-size:14px;box-shadow:0 8px 24px rgba(0,0,0,.25);animation:up .18s ease-out}
 .toast.err{background:var(--red)}
 
+/* ---------- admin: listas editáveis ---------- */
+.ltags{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+.ltag{display:inline-flex;align-items:center;gap:7px;background:var(--pri-s);color:var(--pri-d);border-radius:999px;padding:6px 6px 6px 13px;font-size:13.5px;font-weight:600}
+.ltag button{border:0;background:rgba(10,90,70,.14);color:inherit;width:19px;height:19px;border-radius:50%;display:grid;place-items:center;font-size:11px;line-height:1;padding:0;flex:0 0 auto}
+.ltag button:hover{background:var(--red);color:#fff}
+.laddrow{display:flex;gap:8px}
+.laddrow input{flex:1;min-width:0}
+
 /* ---------- painel TV ---------- */
 body.tv{background:#0f1512;color:#e8efe9}
 .tvwrap{max-width:1500px;margin:0 auto;padding:26px 30px}
@@ -806,30 +814,53 @@ function relLoad(){
 
 /* ---------- admin: listas ---------- */
 var LNOMES={CLINICA:'Clínicas',CATEGORIA:'Categorias profissionais',MOTIVO_SUSPENSAO:'Motivos de suspensão',MAMADEIRA:'Mamadeiras e bicos',CONSISTENCIA:'Consistências',MOTIVO_RECUSA:'Motivos padronizados de recusa'};
+var LISTAS_ST={};
 function viewListas(){
   rpc('apiListas',S.token).then(function(r){
     if(!authGuard(r))return;
+    LISTAS_ST=r.listas||{};
     var h='<div class="card pad mb"><div class="row">'+
       '<div class="field" style="margin:0"><label for="slain">SLA de entrega (minutos)</label><input id="slain" type="number" min="1" max="720" value="'+r.slaMin+'" style="width:130px"></div>'+
       '<button class="btn sm" style="margin-top:20px" onclick="salvarSla()">Salvar SLA</button>'+
       '<p class="muted small grow" style="min-width:220px">Solicitações atendidas acima desse tempo contam como fora do SLA nos relatórios e ficam vermelhas nos painéis.</p>'+
     '</div></div>'+
     '<div class="pgrid" style="grid-template-columns:repeat(auto-fit,minmax(290px,1fr))">';
-    Object.keys(LNOMES).forEach(function(t){
-      h+='<div class="card pad"><h3 style="font-size:15px;margin-bottom:4px">'+LNOMES[t]+'</h3>'+
-        '<p class="muted small mb">Um item por linha.</p>'+
-        '<textarea data-lista="'+t+'" style="width:100%;min-height:140px;border:1px solid var(--line);border-radius:10px;padding:10px">'+esc((r.listas[t]||[]).join('\n'))+'</textarea>'+
-        '<button class="btn sm mt" onclick="salvarLista(this,\''+t+'\')">Salvar lista</button></div>';
-    });
+    Object.keys(LNOMES).forEach(function(t){ h+=listaCardHtml(t); });
     $('#appbody').innerHTML=h+'</div>';
   });
 }
-function salvarLista(btn,t){
-  var vals=$('[data-lista="'+t+'"]').value.split('\n').map(function(v){return v.trim();}).filter(Boolean);
-  busy(btn,true,'Salvando…');
-  rpc('apiSalvarLista',S.token,t,vals).then(function(r){
-    busy(btn,false);
+function listaCardHtml(t){
+  var itens=LISTAS_ST[t]||[];
+  return '<div class="card pad" data-listacard="'+t+'"><h3 style="font-size:15px;margin-bottom:4px">'+LNOMES[t]+'</h3>'+
+    '<p class="muted small mb">'+itens.length+' '+(itens.length===1?'item cadastrado':'itens cadastrados')+'</p>'+
+    '<div class="ltags">'+(itens.length?itens.map(function(v,i){
+      return '<span class="ltag">'+esc(v)+'<button type="button" title="Remover" aria-label="Remover '+esc(v)+'" onclick="removerItemLista(\''+t+'\','+i+')">✕</button></span>';
+    }).join(''):'<span class="muted small">Nenhum item cadastrado ainda.</span>')+'</div>'+
+    '<div class="laddrow"><input placeholder="Novo item…" data-ladd="'+t+'" onkeydown="if(event.key===\'Enter\'){event.preventDefault();adicionarItemLista(\''+t+'\')}">'+
+    '<button class="btn sm" type="button" onclick="adicionarItemLista(\''+t+'\')">Adicionar</button></div></div>';
+}
+function refreshListaCard(t){
+  var el=$('[data-listacard="'+t+'"]');
+  if(el) el.outerHTML=listaCardHtml(t);
+}
+function adicionarItemLista(t){
+  var inp=$('[data-ladd="'+t+'"]');
+  var v=inp.value.trim();
+  if(!v) return;
+  var atuais=LISTAS_ST[t]||[];
+  if(atuais.some(function(x){return x.toLowerCase()===v.toLowerCase();})){ toast('Esse item já existe na lista.',true); return; }
+  salvarListaCompleta(t,atuais.concat([v.toUpperCase()]));
+}
+function removerItemLista(t,i){
+  var novos=(LISTAS_ST[t]||[]).slice();
+  novos.splice(i,1);
+  salvarListaCompleta(t,novos);
+}
+function salvarListaCompleta(t,novos){
+  rpc('apiSalvarLista',S.token,t,novos).then(function(r){
     if(!r.ok){ toast(r.erro,true); return; }
+    LISTAS_ST[t]=novos;
+    refreshListaCard(t);
     toast(LNOMES[t]+' atualizada.');
   });
 }
