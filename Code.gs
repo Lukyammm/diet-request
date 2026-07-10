@@ -17,7 +17,7 @@
  * PAINEL DE TV: abra a URL do app com ?view=tv  (não exige login).
  *************************************************************************/
 
-var SH = { SOL: 'SOLICITACOES', USU: 'USUARIOS', LIS: 'LISTAS' };
+var SH = { SOL: 'SOLICITACOES', USU: 'USUARIOS', LIS: 'LISTAS', AUD: 'AUDITORIA' };
 
 var SOL_HEADERS = [
   'ID', 'CRIADO_EM', 'STATUS', 'TIPO',
@@ -34,6 +34,8 @@ var SOL_HEADERS = [
 ];
 
 var USU_HEADERS = ['ID', 'NOME', 'LOGIN', 'HASH', 'SALT', 'PERFIL', 'ATIVO', 'PRIMEIRO_ACESSO', 'TOKEN', 'TOKEN_EXP'];
+
+var AUD_HEADERS = ['DATA_HORA', 'USUARIO', 'LOGIN', 'ACAO', 'DETALHE'];
 
 var TIPOS = [
   'LIBERAÇÃO DE DIETA',
@@ -75,11 +77,12 @@ function ensureSetup_() {
     var sol = getOrCreate_(ss, SH.SOL, SOL_HEADERS);
     var usu = getOrCreate_(ss, SH.USU, USU_HEADERS);
     var lis = getOrCreate_(ss, SH.LIS, ['TIPO', 'VALOR']);
+    var aud = getOrCreate_(ss, SH.AUD, AUD_HEADERS);
 
     if (lis.getLastRow() < 2) seedListas_(lis);
     if (usu.getLastRow() < 2) seedAdmin_(usu);
 
-    sol.setFrozenRows(1); usu.setFrozenRows(1); lis.setFrozenRows(1);
+    sol.setFrozenRows(1); usu.setFrozenRows(1); lis.setFrozenRows(1); aud.setFrozenRows(1);
     props.setProperty('SETUP_OK', '1');
   } finally {
     lock.releaseLock();
@@ -174,6 +177,12 @@ function hash_(senha, salt) {
   return Utilities.base64Encode(bytes);
 }
 
+function audit_(user, acao, detalhe) {
+  try {
+    sheet_(SH.AUD).appendRow([nowIso_(), user ? user.NOME : 'SISTEMA', user ? user.LOGIN : '', acao, detalhe || '']);
+  } catch (e) { /* auditoria nunca deve derrubar a ação principal */ }
+}
+
 /* ======================= AUTENTICAÇÃO ======================= */
 
 function login(loginName, senha) {
@@ -184,13 +193,15 @@ function login(loginName, senha) {
   for (var i = 0; i < users.length; i++) {
     var u = users[i];
     if (u.LOGIN.toLowerCase() !== loginName) continue;
-    if (u.ATIVO !== 'SIM') return { ok: false, erro: 'Usuário inativo. Procure o administrador.' };
-    if (hash_(senha, u.SALT) !== u.HASH) return { ok: false, erro: 'Login ou senha incorretos.' };
+    if (u.ATIVO !== 'SIM') { audit_(u, 'LOGIN_FALHA', 'Tentativa de login em usuário inativo.'); return { ok: false, erro: 'Usuário inativo. Procure o administrador.' }; }
+    if (hash_(senha, u.SALT) !== u.HASH) { audit_(u, 'LOGIN_FALHA', 'Senha incorreta.'); return { ok: false, erro: 'Login ou senha incorretos.' }; }
     var token = Utilities.getUuid();
     var exp = Date.now() + 12 * 3600 * 1000;
     sh.getRange(u._row, 9, 1, 2).setValues([[token, String(exp)]]);
+    audit_(u, 'LOGIN', 'Login realizado.');
     return { ok: true, token: token, nome: u.NOME, perfil: u.PERFIL, primeiroAcesso: u.PRIMEIRO_ACESSO === 'SIM' };
   }
+  audit_(null, 'LOGIN_FALHA', 'Login inexistente: ' + loginName + '.');
   return { ok: false, erro: 'Login ou senha incorretos.' };
 }
 
@@ -213,7 +224,7 @@ function apiMe(token) {
 
 function logout(token) {
   var u = auth_(token);
-  if (u) sheet_(SH.USU).getRange(u._row, 9, 1, 2).setValues([['', '']]);
+  if (u) { sheet_(SH.USU).getRange(u._row, 9, 1, 2).setValues([['', '']]); audit_(u, 'LOGOUT', 'Logout realizado.'); }
   return { ok: true };
 }
 
@@ -225,6 +236,7 @@ function trocarSenha(token, nova) {
   var salt = Utilities.getUuid();
   sheet_(SH.USU).getRange(u._row, 4, 1, 2).setValues([[hash_(nova, salt), salt]]);
   sheet_(SH.USU).getRange(u._row, 8).setValue('NÃO');
+  audit_(u, 'TROCA_SENHA', 'Senha alterada pelo próprio usuário.');
   return { ok: true };
 }
 
@@ -287,6 +299,7 @@ function pubCriar(o) {
         '', '', '', '', '', '', '', ''
       ];
       sheet_(SH.SOL).appendRow(row);
+      audit_(null, 'SOLICITACAO_CRIADA', 'ID ' + id + ' — ' + s_(o.paciente).toUpperCase() + ' (' + s_(o.tipo) + ') por ' + s_(o.profissional).toUpperCase() + '.');
       return { ok: true, id: id };
     } finally {
       lock.releaseLock();
@@ -364,6 +377,8 @@ function apiResolver(token, o) {
         String(tempoMin),
         conforme
       ]]);
+      audit_(u, analise === 'ACEITA' ? 'SOLICITACAO_ACEITA' : 'SOLICITACAO_RECUSADA',
+        'ID ' + r.ID + ' — ' + r.PACIENTE + (analise === 'RECUSADA' ? ' — motivo: ' + s_(o.motivoRecusa) : '') + '.');
       return { ok: true };
     }
     return { ok: false, erro: 'Solicitação não encontrada.' };
@@ -455,11 +470,13 @@ function apiSalvarUsuario(token, o) {
       if (u.ID === adm.ID && o.ativo === false) return { ok: false, erro: 'Você não pode desativar o próprio usuário.' };
       sh.getRange(u._row, 2).setValue(nome);
       sh.getRange(u._row, 6, 1, 2).setValues([[perfil, o.ativo === false ? 'NÃO' : 'SIM']]);
+      audit_(adm, 'USUARIO_EDITADO', 'Usuário ' + u.LOGIN + ' (' + nome + ') — perfil ' + perfil + ', ativo ' + (o.ativo === false ? 'NÃO' : 'SIM') + '.');
       if (s_(o.senha)) {
         var salt = Utilities.getUuid();
         sh.getRange(u._row, 4, 1, 2).setValues([[hash_(s_(o.senha), salt), salt]]);
         sh.getRange(u._row, 8).setValue('SIM');
         sh.getRange(u._row, 9, 1, 2).setValues([['', '']]);
+        audit_(adm, 'SENHA_REDEFINIDA', 'Senha do usuário ' + u.LOGIN + ' redefinida pelo administrador.');
       }
       return { ok: true };
     }
@@ -473,6 +490,7 @@ function apiSalvarUsuario(token, o) {
   var salt2 = Utilities.getUuid();
   var id = 'U' + (users.length + 1) + '-' + Date.now().toString(36);
   sh.appendRow([id, nome, loginName, hash_(senha, salt2), salt2, perfil, 'SIM', 'SIM', '', '']);
+  audit_(adm, 'USUARIO_CRIADO', 'Usuário criado: ' + loginName + ' (' + nome + '), perfil ' + perfil + '.');
   return { ok: true };
 }
 
@@ -487,7 +505,8 @@ function apiListas(token) {
 }
 
 function apiSalvarLista(token, tipo, valores) {
-  if (!requireAdmin_(token)) return { ok: false, erro: 'Apenas administradores.' };
+  var adm = requireAdmin_(token);
+  if (!adm) return { ok: false, erro: 'Apenas administradores.' };
   tipo = s_(tipo);
   if (LISTAS_EDITAVEIS.indexOf(tipo) === -1) return { ok: false, erro: 'Lista inválida.' };
   valores = (valores || []).map(s_).filter(function (v) { return !!v; });
@@ -499,32 +518,64 @@ function apiSalvarLista(token, tipo, valores) {
     var sh = sheet_(SH.LIS);
     var last = sh.getLastRow();
     var keep = [];
+    var antigos = [];
     if (last >= 2) {
       sh.getRange(2, 1, last - 1, 2).getValues().forEach(function (r) {
-        if (s_(r[0]) !== tipo && s_(r[0])) keep.push([s_(r[0]), s_(r[1])]);
+        var t = s_(r[0]), v = s_(r[1]);
+        if (t !== tipo && t) keep.push([t, v]);
+        if (t === tipo && v) antigos.push(v);
       });
     }
-    valores.forEach(function (v) { keep.push([tipo, v.toUpperCase()]); });
+    var novosUp = valores.map(function (v) { return v.toUpperCase(); });
+    var antigosUp = antigos.map(function (v) { return v.toUpperCase(); });
+    var adicionados = novosUp.filter(function (v) { return antigosUp.indexOf(v) === -1; });
+    var removidos = antigos.filter(function (v) { return novosUp.indexOf(v.toUpperCase()) === -1; });
+
+    novosUp.forEach(function (v) { keep.push([tipo, v]); });
     if (last >= 2) sh.getRange(2, 1, last - 1, 2).clearContent();
     sh.getRange(2, 1, keep.length, 2).setValues(keep);
+
+    adicionados.forEach(function (v) { audit_(adm, 'LISTA_ITEM_ADICIONADO', LNOMES_[tipo] + ': "' + v + '".'); });
+    removidos.forEach(function (v) { audit_(adm, 'LISTA_ITEM_REMOVIDO', LNOMES_[tipo] + ': "' + v + '".'); });
     return { ok: true };
   } finally {
     lock.releaseLock();
   }
 }
 
+var LNOMES_ = { CLINICA: 'Clínicas', CATEGORIA: 'Categorias profissionais', MOTIVO_SUSPENSAO: 'Motivos de suspensão', MAMADEIRA: 'Mamadeiras e bicos', CONSISTENCIA: 'Consistências', MOTIVO_RECUSA: 'Motivos padronizados de recusa' };
+
 function apiSalvarSla(token, minutos) {
-  if (!requireAdmin_(token)) return { ok: false, erro: 'Apenas administradores.' };
+  var adm = requireAdmin_(token);
+  if (!adm) return { ok: false, erro: 'Apenas administradores.' };
   var n = parseInt(minutos, 10);
   if (!(n > 0 && n <= 720)) return { ok: false, erro: 'Informe um SLA entre 1 e 720 minutos.' };
   var sh = sheet_(SH.LIS);
   var last = sh.getLastRow();
+  var anterior = slaMin_();
   for (var i = 2; i <= last; i++) {
     if (s_(sh.getRange(i, 1).getValue()) === 'CONFIG' && /^SLA_MINUTOS/i.test(s_(sh.getRange(i, 2).getValue()))) {
       sh.getRange(i, 2).setValue('SLA_MINUTOS=' + n);
+      audit_(adm, 'SLA_ALTERADO', 'SLA alterado de ' + anterior + ' para ' + n + ' minutos.');
       return { ok: true };
     }
   }
   sh.appendRow(['CONFIG', 'SLA_MINUTOS=' + n]);
+  audit_(adm, 'SLA_ALTERADO', 'SLA alterado de ' + anterior + ' para ' + n + ' minutos.');
   return { ok: true };
+}
+
+function apiAuditoria(token, busca) {
+  if (!requireAdmin_(token)) return { ok: false, erro: 'Apenas administradores.' };
+  busca = s_(busca).toLowerCase();
+  var itens = rowsAsObjects_(sheet_(SH.AUD), AUD_HEADERS)
+    .filter(function (r) {
+      if (!busca) return true;
+      var alvo = (r.USUARIO + ' ' + r.LOGIN + ' ' + r.ACAO + ' ' + r.DETALHE).toLowerCase();
+      return alvo.indexOf(busca) !== -1;
+    })
+    .sort(function (a, b) { return a.DATA_HORA < b.DATA_HORA ? 1 : -1; })
+    .slice(0, 300)
+    .map(function (r) { return { dataHora: r.DATA_HORA, usuario: r.USUARIO, login: r.LOGIN, acao: r.ACAO, detalhe: r.DETALHE }; });
+  return { ok: true, itens: itens };
 }
