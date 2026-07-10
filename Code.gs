@@ -469,7 +469,7 @@ function apiSalvarUsuario(token, o) {
   for (var j = 0; j < users.length; j++) {
     if (users[j].LOGIN.toLowerCase() === loginName) return { ok: false, erro: 'Este login já existe.' };
   }
-  var senha = s_(o.senha) || 'dieta@2026';
+  var senha = s_(o.senha) || loginName;
   var salt2 = Utilities.getUuid();
   var id = 'U' + (users.length + 1) + '-' + Date.now().toString(36);
   sh.appendRow([id, nome, loginName, hash_(senha, salt2), salt2, perfil, 'SIM', 'SIM', '', '']);
