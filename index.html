@@ -223,6 +223,10 @@ body.tv{background:#0f1512;color:#e8efe9}
 .tvatend{background:#12362a;color:#7fe0bb}.tvrecu{background:#3d1a14;color:#f09884}
 .tvexit{position:fixed;top:calc(16px + var(--sa-t));right:calc(18px + var(--sa-r));z-index:50;background:#17211b;color:#e8efe9;border:1px solid #223129;border-radius:10px;padding:9px 16px;min-height:var(--tap);font-size:14px;font-weight:600;opacity:.75;transition:.15s}
 .tvexit:hover{opacity:1;border-color:#9fb0a6}
+/* em telas estreitas o botão fixo de sair sobrepõe o relógio do cabeçalho — reserva espaço acima */
+@media(max-width:700px){
+  .tvexit ~ .tvwrap{padding-top:calc(58px + var(--sa-t))}
+}
 </style>
 </head>
 <body>
