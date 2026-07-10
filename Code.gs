@@ -67,13 +67,21 @@ function setup() {
 
 function ensureSetup_() {
   var props = PropertiesService.getScriptProperties();
-  if (props.getProperty('SETUP_OK') === '1') return;
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  /* Caminho rápido: se todas as abas exigidas já existem, não precisa de
+     lock nem de reescrever nada. Isso é o que torna o setup "auto-curável":
+     se uma aba nova (ex.: AUDITORIA) for adicionada ao sistema depois que
+     SETUP_OK já foi gravado em uma planilha antiga, o flag sozinho não
+     bastava para pular a criação — agora sempre conferimos a existência
+     real das abas antes de decidir que não há nada a fazer. */
+  if (props.getProperty('SETUP_OK') === '1' &&
+      ss.getSheetByName(SH.SOL) && ss.getSheetByName(SH.USU) &&
+      ss.getSheetByName(SH.LIS) && ss.getSheetByName(SH.AUD)) return;
+
   var lock = LockService.getScriptLock();
   lock.waitLock(30000);
   try {
-    if (props.getProperty('SETUP_OK') === '1') return;
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-
     var sol = getOrCreate_(ss, SH.SOL, SOL_HEADERS);
     var usu = getOrCreate_(ss, SH.USU, USU_HEADERS);
     var lis = getOrCreate_(ss, SH.LIS, ['TIPO', 'VALOR']);
