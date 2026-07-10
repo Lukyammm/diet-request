@@ -191,6 +191,8 @@ body.tv{background:#0f1512;color:#e8efe9}
 .tvrec:last-child{border:0}
 .tvbadge{font-size:10.5px;font-weight:700;border-radius:99px;padding:2px 9px;letter-spacing:.05em}
 .tvatend{background:#12362a;color:#7fe0bb}.tvrecu{background:#3d1a14;color:#f09884}
+.tvexit{position:fixed;top:16px;right:18px;z-index:50;background:#17211b;color:#e8efe9;border:1px solid #223129;border-radius:10px;padding:9px 16px;font-size:14px;font-weight:600;opacity:.75;transition:.15s}
+.tvexit:hover{opacity:1;border-color:#9fb0a6}
 </style>
 </head>
 <body>
@@ -938,6 +940,7 @@ function tvRender(){
   }).join('');
 
   $('#v-tv').innerHTML=
+    (MODE!=='tv' ? '<button class="tvexit" onclick="location.reload()">✕ Sair do painel</button>' : '')+
     '<div class="tvwrap">'+
       '<div class="tvhead"><h1>Solicitações de Dieta</h1><span style="color:#9fb0a6">SLA '+r.slaMin+' min</span><span class="clock" id="tvclock">'+tvClock()+'</span></div>'+
       '<div class="tvgrid">'+
