@@ -11,7 +11,7 @@
  *  5. Implantar > Nova implantação > App da Web
  *       Executar como: Eu
  *       Quem tem acesso: Qualquer pessoa (o app tem login próprio).
- *  6. Primeiro acesso administrativo: login "admin", senha "dieta@2026"
+ *  6. Primeiro acesso administrativo: login "admin", senha "admin"
  *     (troca obrigatória no primeiro login).
  *
  * PAINEL DE TV: abra a URL do app com ?view=tv  (não exige login).
@@ -60,7 +60,7 @@ function doGet(e) {
 function setup() {
   PropertiesService.getScriptProperties().deleteProperty('SETUP_OK');
   ensureSetup_();
-  return 'Setup concluído. Login inicial: admin / dieta@2026';
+  return 'Setup concluído. Login inicial: admin / admin';
 }
 
 function ensureSetup_() {
@@ -118,7 +118,7 @@ function seedListas_(sh) {
 
 function seedAdmin_(sh) {
   var salt = Utilities.getUuid();
-  sh.appendRow(['U1', 'ADMINISTRADOR', 'admin', hash_('dieta@2026', salt), salt, 'ADMIN', 'SIM', 'SIM', '', '']);
+  sh.appendRow(['U1', 'ADMINISTRADOR', 'admin', hash_('admin', salt), salt, 'ADMIN', 'SIM', 'SIM', '', '']);
 }
 
 /* ======================= UTILS ======================= */
