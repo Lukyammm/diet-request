@@ -997,15 +997,26 @@ function formUsu(i){
 }
 
 /* ================= painel TV ================= */
+var TV_EXIT_BOUND=false;
+function exitTV(){
+  clearTimers();
+  document.body.classList.remove('tv');
+  $('#v-tv').classList.add('hide');
+  $('#v-tv').innerHTML='';
+  $('#topbar').classList.remove('hide');
+  $('#main').classList.remove('hide');
+  if(S.user) showApp(); else goPublic();
+}
 function startTV(){
   clearTimers();
   document.body.classList.add('tv');
   $('#topbar').classList.add('hide');
   $('#main').classList.add('hide');
   $('#v-tv').classList.remove('hide');
-  if(MODE!=='tv'){
-    document.addEventListener('keydown',function(e){ if(e.key==='Escape')location.reload(); });
-    $('#v-tv').addEventListener('dblclick',function(){ location.reload(); });
+  if(MODE!=='tv'&&!TV_EXIT_BOUND){
+    TV_EXIT_BOUND=true;
+    document.addEventListener('keydown',function(e){ if(e.key==='Escape')exitTV(); });
+    $('#v-tv').addEventListener('dblclick',function(){ exitTV(); });
   }
   tvLoad();
   S.timers.push(setInterval(tvLoad,45000));
@@ -1050,7 +1061,7 @@ function tvRender(){
   }).join('');
 
   $('#v-tv').innerHTML=
-    (MODE!=='tv' ? '<button class="tvexit" onclick="location.reload()">✕ Sair do painel</button>' : '')+
+    (MODE!=='tv' ? '<button class="tvexit" onclick="exitTV()">✕ Sair do painel</button>' : '')+
     '<div class="tvwrap">'+
       '<div class="tvhead"><h1>Solicitações de Dieta</h1><span style="color:#9fb0a6">SLA '+r.slaMin+' min</span><span class="clock" id="tvclock">'+tvClock()+'</span></div>'+
       '<div class="tvgrid">'+
