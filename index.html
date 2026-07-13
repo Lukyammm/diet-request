@@ -527,6 +527,7 @@ function collect(){
 function validar(){
   var t=tipoIdx(F.tipo);
   var need=[];
+  if(STEP===1) need=[['tipo','tipo de solicitação']];
   if(STEP===2) need=[['paciente','nome do paciente'],['prontuario','prontuário'],['clinica','clínica'],['enfermariaLeito','enfermaria e leito']];
   if(STEP===3){
     if(t===0) need=[['tipoDieta','tipo de dieta'],['prescricao','prescrição médica']];
