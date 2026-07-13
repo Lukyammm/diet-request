@@ -321,6 +321,17 @@ function slaClass(min){ var s=S.slaMin||30; if(min>s)return 'late'; if(min>=s*0.
 
 function saveTok(t){ try{ localStorage.setItem('sd_token',t||''); }catch(e){} }
 function loadTok(){ try{ return localStorage.getItem('sd_token')||''; }catch(e){ return ''; } }
+/* Mês corrente no fuso local do navegador (evita divergir do backend perto da
+   virada do mês, quando toISOString() já apontaria para o mês seguinte em UTC). */
+function ymNow(){ var d=new Date(); return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2); }
+/* Handler de falha de RPC: destrava o botão e avisa em vez de deixar spinner preso. */
+function rpcFail(btn){ return function(){ if(btn) busy(btn,false); toast('Falha de conexão com o servidor. Tente novamente.',true); }; }
+/* Erro ao carregar um bloco: mostra estado recuperável no lugar do spinner. */
+function bodyError(sel,msg,retry){
+  var el=$(sel); if(!el) return;
+  el.innerHTML='<div class="card empty"><b>Não foi possível carregar</b>'+esc(msg||'Verifique a conexão e tente novamente.')+
+    (retry?'<div class="mt"><button class="btn sm" onclick="'+retry+'">Tentar novamente</button></div>':'')+'</div>';
+}
 
 /* ================= formulário público ================= */
 var F = {};
@@ -367,7 +378,15 @@ function step1(){
       '<span class="n">'+(i+1)+'</span><span><b>'+esc(t.charAt(0)+t.slice(1).toLowerCase())+'</b><small>'+esc(TIPO_DESC[i])+'</small></span></button>';
   }).join('')+'</div>';
 }
-function pickTipo(i){ F.tipo=TIPOS[i]; STEP=2; renderWizard(); }
+/* Campos específicos de cada tipo: são limpos ao trocar o tipo para não
+   "vazar" um valor antigo (ex.: prescrição de uma LIBERAÇÃO) para o registro
+   de outro tipo, já que o servidor grava todos os campos enviados. */
+var CAMPOS_TIPO=['horarioPrescricao','tipoDieta','prescricao','comorb','comorbOutras','espessada','consistencia','espessanteAgua','qtdEnteral','motivoSuspensao','novaPrescricao','mamadeira','espessamento','viaOral','solicFono','obs'];
+function pickTipo(i){
+  var novo=TIPOS[i];
+  if(F.tipo && F.tipo!==novo) CAMPOS_TIPO.forEach(function(k){ delete F[k]; });
+  F.tipo=novo; STEP=2; renderWizard();
+}
 
 function fld(id,label,type,attrs,hint){
   return '<div class="field"><label for="'+id+'">'+label+(hint?' <span class="hint">'+hint+'</span>':'')+'</label>'+
@@ -600,7 +619,7 @@ function forceSenha(){
     rpc('trocarSenha',S.token,a).then(function(r){
       if(!r.ok){ busy(btn,false); toast(r.erro,true); return; }
       closeModal(); toast('Senha atualizada.'); showApp();
-    });
+    }).catch(rpcFail(btn));
   };
 }
 
@@ -621,7 +640,7 @@ function sair(){
   var t=S.token;
   S.token=null; S.user=null; saveTok('');
   refreshChip(); clearTimers(); goPublic();
-  if(t) rpc('logout',t);
+  if(t) rpc('logout',t).catch(function(){});
 }
 
 /* ================= app ================= */
@@ -696,7 +715,7 @@ function viewPend(){
       });
     },30000);
     S.timers.push(tick);
-  });
+  }).catch(function(){ bodyError('#appbody','Não foi possível carregar as pendências.','viewPend()'); });
 }
 
 var CAMPOS_DET=[
@@ -768,13 +787,13 @@ function detalhe(i){
       if(!r.ok){ busy(btn,false); toast(r.erro,true); return; }
       closeModal(); toast(analise==='ACEITA'?'Entrega registrada.':'Solicitação recusada.');
       viewPend();
-    });
+    }).catch(rpcFail(btn));
   };
 }
 
 /* ---------- histórico ---------- */
 function viewHist(){
-  var mes=new Date().toISOString().slice(0,7);
+  var mes=ymNow();
   $('#appbody').innerHTML=
     '<div class="card pad mb"><div class="row">'+
       '<div class="field grow" style="margin:0;min-width:150px"><label for="h_mes">Mês</label><input id="h_mes" type="month" value="'+mes+'"></div>'+
@@ -801,7 +820,7 @@ function histLoad(){
           '<td><b>'+esc(it.PACIENTE)+'</b><br><span class="muted small">'+esc(it.ID)+'</span></td>'+
           '<td>'+esc(it.CLINICA)+'</td><td>'+st+'</td><td>'+(it.TEMPO_MIN?fmtMin(it.TEMPO_MIN):'—')+'</td></tr>';
       }).join('')+'</tbody></table></div>';
-  });
+  }).catch(function(){ bodyError('#histbody','Não foi possível carregar o histórico.','histLoad()'); });
 }
 function histDet(i){
   var it=HIST[i];
@@ -812,7 +831,7 @@ function histDet(i){
 
 /* ---------- relatórios ---------- */
 function viewRel(){
-  var mes=new Date().toISOString().slice(0,7);
+  var mes=ymNow();
   $('#appbody').innerHTML=
     '<div class="row mb"><div class="field" style="margin:0"><label for="r_mes">Competência</label>'+
     '<input id="r_mes" type="month" value="'+mes+'" onchange="relLoad()"></div></div><div id="relbody"></div>';
@@ -846,7 +865,7 @@ function relLoad(){
         '<div class="card pad"><h3 style="font-size:15px;margin-bottom:12px">Recusas por motivo</h3>'+barras(r.recusaPorMotivo,'var(--red)')+'</div>'+
         '<div class="card pad"><h3 style="font-size:15px;margin-bottom:12px">Por categoria solicitante</h3>'+barras(r.porCategoria,'var(--purple)')+'</div>'+
       '</div>';
-  });
+  }).catch(function(){ bodyError('#relbody','Não foi possível carregar os relatórios.','relLoad()'); });
 }
 
 /* ---------- admin: listas ---------- */
@@ -864,7 +883,7 @@ function viewListas(){
     '<div class="pgrid" style="grid-template-columns:repeat(auto-fit,minmax(min(100%,290px),1fr))">';
     Object.keys(LNOMES).forEach(function(t){ h+=listaCardHtml(t); });
     $('#appbody').innerHTML=h+'</div>';
-  });
+  }).catch(function(){ bodyError('#appbody','Não foi possível carregar as listas.','viewListas()'); });
 }
 function listaCardHtml(t){
   var itens=LISTAS_ST[t]||[];
@@ -912,7 +931,7 @@ function salvarListaCompleta(t,novos,onOk){
     LISTAS_ST[t]=novos;
     refreshListaCard(t);
     if(onOk) onOk(); else toast(LNOMES[t]+' atualizada.');
-  });
+  }).catch(function(){ toast('Falha ao salvar a lista. Tente novamente.',true); });
 }
 
 /* ---------- admin: auditoria ---------- */
@@ -941,13 +960,13 @@ function carregarAuditoria(){
           '<td>'+esc(x.usuario)+(x.login?' <span class="muted small">('+esc(x.login)+')</span>':'')+'</td>'+
           '<td>'+esc(x.acao)+'</td><td>'+esc(x.detalhe)+'</td></tr>';
       }).join('')+'</tbody></table></div>';
-  });
+  }).catch(function(){ bodyError('#aud_list','Não foi possível carregar a auditoria.','carregarAuditoria()'); });
 }
 function salvarSla(){
   rpc('apiSalvarSla',S.token,$('#slain').value).then(function(r){
     if(!r.ok){ toast(r.erro,true); return; }
     toast('SLA atualizado.');
-  });
+  }).catch(function(){ toast('Falha ao salvar o SLA. Tente novamente.',true); });
 }
 
 /* ---------- admin: usuários ---------- */
@@ -965,7 +984,7 @@ function viewUsu(){
           '<td>'+(u.ativo?'<span class="badge bok">Ativo</span>':'<span class="badge blate">Inativo</span>')+
           (u.primeiroAcesso?' <span class="badge bwarn">1º acesso</span>':'')+'</td></tr>';
       }).join('')+'</tbody></table></div>';
-  });
+  }).catch(function(){ bodyError('#appbody','Não foi possível carregar os usuários.','viewUsu()'); });
 }
 function formUsu(i){
   var u=(i===undefined)?{}:USUS[i];
@@ -992,7 +1011,7 @@ function formUsu(i){
     rpc('apiSalvarUsuario',S.token,o).then(function(r){
       if(!r.ok){ busy(btn,false); toast(r.erro,true); return; }
       closeModal(); toast('Usuário salvo.'); viewUsu();
-    });
+    }).catch(rpcFail(btn));
   };
 }
 
