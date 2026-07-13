@@ -977,12 +977,13 @@ function viewUsu(){
     USUS=r.itens;
     $('#appbody').innerHTML=
       '<div class="row mb"><span class="grow"></span><button class="btn sm" onclick="formUsu()">+ Novo usuário</button></div>'+
-      '<div class="card tblwrap"><table class="tbl"><thead><tr><th>Nome</th><th>Login</th><th>Perfil</th><th>Status</th></tr></thead><tbody>'+
+      '<div class="card tblwrap"><table class="tbl"><thead><tr><th>Nome</th><th>Login</th><th>Perfil</th><th>Status</th><th>Ações</th></tr></thead><tbody>'+
       r.itens.map(function(u,i){
         return '<tr class="link" onclick="formUsu('+i+')"><td><b>'+esc(u.nome)+'</b></td><td>'+esc(u.login)+'</td>'+
           '<td>'+(u.perfil==='ADMIN'?'<span class="badge b4">Admin</span>':'<span class="badge b5">Nutrição</span>')+'</td>'+
           '<td>'+(u.ativo?'<span class="badge bok">Ativo</span>':'<span class="badge blate">Inativo</span>')+
-          (u.primeiroAcesso?' <span class="badge bwarn">1º acesso</span>':'')+'</td></tr>';
+          (u.primeiroAcesso?' <span class="badge bwarn">1º acesso</span>':'')+'</td>'+
+          '<td><button class="btn ghost sm" type="button" onclick="event.stopPropagation();formUsu('+i+')">Editar</button></td></tr>';
       }).join('')+'</tbody></table></div>';
   }).catch(function(){ bodyError('#appbody','Não foi possível carregar os usuários.','viewUsu()'); });
 }
@@ -993,16 +994,29 @@ function formUsu(i){
     '<div class="mb">'+
       '<div class="field"><label for="u_nome">Nome</label><input id="u_nome" value="'+esc(u.nome||'')+'"></div>'+
       '<div class="grid2">'+
-        '<div class="field"><label for="u_login">Login</label><input id="u_login" value="'+esc(u.login||'')+'" '+(u.id?'disabled':'')+'></div>'+
+        '<div class="field"><label for="u_login">Login</label><input id="u_login" value="'+esc(u.login||'')+'" placeholder="ex.: maria.silva"></div>'+
         '<div class="field"><label for="u_perfil">Perfil</label><select id="u_perfil"><option'+(u.perfil!=='ADMIN'?' selected':'')+'>NUTRICAO</option><option'+(u.perfil==='ADMIN'?' selected':'')+'>ADMIN</option></select></div>'+
       '</div>'+
       '<div class="grid2">'+
         '<div class="field"><label for="u_senha">'+(u.id?'Nova senha':'Senha inicial')+' <span class="hint">'+(u.id?'vazio = manter':'vazio = usar o login como senha')+'</span></label><input id="u_senha"></div>'+
         '<div class="field"><label for="u_ativo">Ativo</label><select id="u_ativo"><option'+(u.ativo!==false?' selected':'')+'>SIM</option><option'+(u.ativo===false?' selected':'')+'>NÃO</option></select></div>'+
       '</div>'+
-      '<p class="muted small">A senha definida aqui exige troca no primeiro login do usuário.</p>'+
+      '<p class="muted small">A senha definida aqui exige troca no primeiro login do usuário. Para bloquear acesso sem perder histórico, marque o usuário como inativo.</p>'+
     '</div>'+
-    '<div class="mf"><button class="btn ghost" onclick="closeModal()">Cancelar</button><button class="btn" id="u_go">Salvar</button></div>');
+    '<div class="mf">'+
+      (u.id?'<button class="btn danger" id="u_del" type="button">Apagar</button>':'')+
+      '<button class="btn ghost" onclick="closeModal()">Cancelar</button><button class="btn" id="u_go">Salvar</button></div>');
+
+  if(u.id && $('#u_del')){
+    $('#u_del').onclick=function(){
+      if(!confirm('Apagar definitivamente este usuário? O histórico/auditoria será mantido, mas o cadastro será removido.')) return;
+      busy(this,true,'Apagando…'); var btn=this;
+      rpc('apiExcluirUsuario',S.token,u.id).then(function(r){
+        if(!r.ok){ busy(btn,false); toast(r.erro,true); return; }
+        closeModal(); toast('Usuário apagado.'); viewUsu();
+      }).catch(rpcFail(btn));
+    };
+  }
   $('#u_go').onclick=function(){
     var o={id:u.id,nome:$('#u_nome').value.trim(),login:$('#u_login').value.trim(),
       perfil:$('#u_perfil').value,senha:$('#u_senha').value,ativo:$('#u_ativo').value==='SIM'};

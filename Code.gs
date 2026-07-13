@@ -519,45 +519,82 @@ function apiUsuarios(token) {
   return { ok: true, itens: itens };
 }
 
+function activeAdminCount_(users, ignoreId) {
+  var n = 0;
+  users.forEach(function (u) {
+    if (u.ID !== ignoreId && u.PERFIL === 'ADMIN' && u.ATIVO === 'SIM') n++;
+  });
+  return n;
+}
+
 function apiSalvarUsuario(token, o) {
   var adm = requireAdmin_(token);
   if (!adm) return { ok: false, erro: 'Apenas administradores.' };
   o = o || {};
+  var idReq = s_(o.id);
   var nome = s_(o.nome).toUpperCase(), loginName = s_(o.login).toLowerCase(), perfil = s_(o.perfil) === 'ADMIN' ? 'ADMIN' : 'NUTRICAO';
+  var ativo = o.ativo === false ? 'NÃO' : 'SIM';
   if (!nome || !loginName) return { ok: false, erro: 'Nome e login são obrigatórios.' };
+  if (!/^[a-z0-9._-]{3,40}$/.test(loginName)) return { ok: false, erro: 'O login deve ter 3 a 40 caracteres e usar apenas letras, números, ponto, hífen ou sublinhado.' };
   return withLock_(function () {
     var sh = sheet_(SH.USU);
     var users = rowsAsObjects_(sh, USU_HEADERS);
 
-    if (o.id) {
+    for (var j = 0; j < users.length; j++) {
+      if (users[j].LOGIN.toLowerCase() === loginName && users[j].ID !== idReq) return { ok: false, erro: 'Este login já existe.' };
+    }
+
+    if (idReq) {
       for (var i = 0; i < users.length; i++) {
         var u = users[i];
-        if (u.ID !== s_(o.id)) continue;
-        if (u.ID === adm.ID && o.ativo === false) return { ok: false, erro: 'Você não pode desativar o próprio usuário.' };
-        sh.getRange(u._row, 2).setValue(nome);
-        sh.getRange(u._row, 6, 1, 2).setValues([[perfil, o.ativo === false ? 'NÃO' : 'SIM']]);
-        audit_(adm, 'USUARIO_EDITADO', 'Usuário ' + u.LOGIN + ' (' + nome + ') — perfil ' + perfil + ', ativo ' + (o.ativo === false ? 'NÃO' : 'SIM') + '.');
+        if (u.ID !== idReq) continue;
+        if (u.ID === adm.ID && ativo === 'NÃO') return { ok: false, erro: 'Você não pode desativar o próprio usuário.' };
+        if (u.PERFIL === 'ADMIN' && (perfil !== 'ADMIN' || ativo === 'NÃO') && activeAdminCount_(users, u.ID) < 1) {
+          return { ok: false, erro: 'Mantenha pelo menos um administrador ativo no sistema.' };
+        }
+        sh.getRange(u._row, 2, 1, 2).setValues([[nome, loginName]]);
+        sh.getRange(u._row, 6, 1, 2).setValues([[perfil, ativo]]);
+        if (u.LOGIN.toLowerCase() !== loginName || ativo === 'NÃO') sh.getRange(u._row, 9, 1, 2).setValues([['', '']]);
+        audit_(adm, 'USUARIO_EDITADO', 'Usuário ' + u.LOGIN + ' editado para login ' + loginName + ' (' + nome + ') — perfil ' + perfil + ', ativo ' + ativo + '.');
         if (s_(o.senha)) {
           var salt = Utilities.getUuid();
           sh.getRange(u._row, 4, 1, 2).setValues([[hash_(s_(o.senha), salt), salt]]);
           sh.getRange(u._row, 8).setValue('SIM');
           sh.getRange(u._row, 9, 1, 2).setValues([['', '']]);
-          audit_(adm, 'SENHA_REDEFINIDA', 'Senha do usuário ' + u.LOGIN + ' redefinida pelo administrador.');
+          audit_(adm, 'SENHA_REDEFINIDA', 'Senha do usuário ' + loginName + ' redefinida pelo administrador.');
         }
         return { ok: true };
       }
       return { ok: false, erro: 'Usuário não encontrado.' };
     }
 
-    for (var j = 0; j < users.length; j++) {
-      if (users[j].LOGIN.toLowerCase() === loginName) return { ok: false, erro: 'Este login já existe.' };
-    }
     var senha = s_(o.senha) || loginName;
     var salt2 = Utilities.getUuid();
     var id = 'U' + (users.length + 1) + '-' + Date.now().toString(36);
     sh.appendRow([id, nome, loginName, hash_(senha, salt2), salt2, perfil, 'SIM', 'SIM', '', '']);
     audit_(adm, 'USUARIO_CRIADO', 'Usuário criado: ' + loginName + ' (' + nome + '), perfil ' + perfil + '.');
     return { ok: true };
+  });
+}
+
+function apiExcluirUsuario(token, id) {
+  var adm = requireAdmin_(token);
+  if (!adm) return { ok: false, erro: 'Apenas administradores.' };
+  id = s_(id);
+  if (!id) return { ok: false, erro: 'Usuário inválido.' };
+  if (id === adm.ID) return { ok: false, erro: 'Você não pode apagar o próprio usuário.' };
+  return withLock_(function () {
+    var sh = sheet_(SH.USU);
+    var users = rowsAsObjects_(sh, USU_HEADERS);
+    for (var i = 0; i < users.length; i++) {
+      var u = users[i];
+      if (u.ID !== id) continue;
+      if (u.PERFIL === 'ADMIN' && activeAdminCount_(users, u.ID) < 1) return { ok: false, erro: 'Mantenha pelo menos um administrador ativo no sistema.' };
+      sh.deleteRow(u._row);
+      audit_(adm, 'USUARIO_EXCLUIDO', 'Usuário excluído: ' + u.LOGIN + ' (' + u.NOME + ').');
+      return { ok: true };
+    }
+    return { ok: false, erro: 'Usuário não encontrado.' };
   });
 }
 
