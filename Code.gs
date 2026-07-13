@@ -65,7 +65,12 @@ function setup() {
   return 'Setup concluído. Login inicial: admin / admin';
 }
 
+/* Verificado uma vez por execução: evita reler ScriptProperties e reconferir
+   as abas a cada chamada de sheet_() dentro da mesma requisição. */
+var SETUP_VERIFIED_ = false;
+
 function ensureSetup_() {
+  if (SETUP_VERIFIED_) return;
   var props = PropertiesService.getScriptProperties();
   var ss = SpreadsheetApp.getActiveSpreadsheet();
 
@@ -77,7 +82,7 @@ function ensureSetup_() {
      real das abas antes de decidir que não há nada a fazer. */
   if (props.getProperty('SETUP_OK') === '1' &&
       ss.getSheetByName(SH.SOL) && ss.getSheetByName(SH.USU) &&
-      ss.getSheetByName(SH.LIS) && ss.getSheetByName(SH.AUD)) return;
+      ss.getSheetByName(SH.LIS) && ss.getSheetByName(SH.AUD)) { SETUP_VERIFIED_ = true; return; }
 
   var lock = LockService.getScriptLock();
   lock.waitLock(30000);
@@ -92,6 +97,7 @@ function ensureSetup_() {
 
     sol.setFrozenRows(1); usu.setFrozenRows(1); lis.setFrozenRows(1); aud.setFrozenRows(1);
     props.setProperty('SETUP_OK', '1');
+    SETUP_VERIFIED_ = true;
   } finally {
     lock.releaseLock();
   }
@@ -138,6 +144,30 @@ function ss_() { return SpreadsheetApp.getActiveSpreadsheet(); }
 function sheet_(name) { ensureSetup_(); return ss_().getSheetByName(name); }
 function nowIso_() { return new Date().toISOString(); }
 function s_(v) { return v === null || v === undefined ? '' : String(v).trim(); }
+
+/* Datas locais: os timestamps são gravados em UTC (ISO), mas as agregações
+   "de hoje" / "do mês" precisam usar o fuso do hospital — senão, nas últimas
+   horas do dia (UTC-3) o painel zera cedo e o corte do mês fica errado. */
+function tz_() { return Session.getScriptTimeZone() || 'America/Sao_Paulo'; }
+function localDay_(iso) {
+  var d = iso ? new Date(iso) : new Date();
+  return isNaN(d.getTime()) ? '' : Utilities.formatDate(d, tz_(), 'yyyy-MM-dd');
+}
+function localMonth_(iso) {
+  var d = iso ? new Date(iso) : new Date();
+  return isNaN(d.getTime()) ? '' : Utilities.formatDate(d, tz_(), 'yyyy-MM');
+}
+
+/* Lock com timeout tolerante: em vez de lançar exceção (que deixaria o botão
+   preso em "Salvando…" no cliente), devolve um erro amigável quando o sistema
+   está sob concorrência. */
+function withLock_(fn, ms) {
+  var lock = LockService.getScriptLock();
+  var got = false;
+  try { got = lock.tryLock(ms || 20000); } catch (e) { got = false; }
+  if (!got) return { ok: false, erro: 'Sistema ocupado no momento. Aguarde alguns segundos e tente novamente.' };
+  try { return fn(); } finally { lock.releaseLock(); }
+}
 
 function rowsAsObjects_(sh, headers) {
   var last = sh.getLastRow();
@@ -192,7 +222,10 @@ function nextId_() {
   var props = PropertiesService.getScriptProperties();
   var n = parseInt(props.getProperty('SEQ') || '0', 10) + 1;
   props.setProperty('SEQ', String(n));
-  return 'SD-' + ('0000' + n).slice(-4);
+  var s = String(n);
+  /* Zero-padding só até 4 dígitos; acima de 9999 mantém o número inteiro para
+     não colidir (ex.: 10000 e 20000 gerariam o mesmo ID com slice(-4)). */
+  return 'SD-' + (s.length < 4 ? ('0000' + s).slice(-4) : s);
 }
 
 function hash_(senha, salt) {
@@ -220,13 +253,11 @@ function login(loginName, senha) {
     if (hash_(senha, u.SALT) !== u.HASH) { audit_(u, 'LOGIN_FALHA', 'Senha incorreta.'); return { ok: false, erro: 'Login ou senha incorretos.' }; }
     var token = Utilities.getUuid();
     var exp = Date.now() + 12 * 3600 * 1000;
-    var lock = LockService.getScriptLock();
-    lock.waitLock(20000);
-    try {
+    var w = withLock_(function () {
       sh.getRange(u._row, 9, 1, 2).setValues([[token, String(exp)]]);
-    } finally {
-      lock.releaseLock();
-    }
+      return { ok: true };
+    });
+    if (!w.ok) return w;
     audit_(u, 'LOGIN', 'Login realizado.');
     return { ok: true, token: token, nome: u.NOME, perfil: u.PERFIL, primeiroAcesso: u.PRIMEIRO_ACESSO === 'SIM' };
   }
@@ -263,15 +294,13 @@ function trocarSenha(token, nova) {
   nova = s_(nova);
   if (nova.length < 6) return { ok: false, erro: 'A nova senha precisa de pelo menos 6 caracteres.' };
   var salt = Utilities.getUuid();
-  var lock = LockService.getScriptLock();
-  lock.waitLock(20000);
-  try {
+  var w = withLock_(function () {
     var sh = sheet_(SH.USU);
     sh.getRange(u._row, 4, 1, 2).setValues([[hash_(nova, salt), salt]]);
     sh.getRange(u._row, 8).setValue('NÃO');
-  } finally {
-    lock.releaseLock();
-  }
+    return { ok: true };
+  });
+  if (!w.ok) return w;
   audit_(u, 'TROCA_SENHA', 'Senha alterada pelo próprio usuário.');
   return { ok: true };
 }
@@ -318,9 +347,7 @@ function pubCriar(o) {
       sucoManitol = (s_(o.viaOral) === 'SIM') ? 'SIM — SUCO DE LARANJA (500 ML)' : 'NÃO SE APLICA';
     }
 
-    var lock = LockService.getScriptLock();
-    lock.waitLock(20000);
-    try {
+    return withLock_(function () {
       var id = nextId_();
       var row = [
         id, nowIso_(), 'PENDENTE', s_(o.tipo),
@@ -338,9 +365,7 @@ function pubCriar(o) {
       audit_(null, 'SOLICITACAO_CRIADA', 'ID ' + id + ' — ' + s_(o.paciente).toUpperCase() + ' (' + s_(o.tipo) + ') por ' + s_(o.profissional).toUpperCase() + '.');
       cacheInvalidate_('painel');
       return { ok: true, id: id };
-    } finally {
-      lock.releaseLock();
-    }
+    });
   } catch (e) {
     return { ok: false, erro: e.message || String(e) };
   }
@@ -352,11 +377,11 @@ function pubPainel() {
   var cached = cacheGetJson_('painel');
   if (cached) { cached.agora = nowIso_(); return cached; }
   var all = rowsAsObjects_(sheet_(SH.SOL), SOL_HEADERS);
-  var hoje = new Date().toISOString().slice(0, 10);
+  var hoje = localDay_();
   var pend = [], recentes = [], stats = { total: 0, pendentes: 0, atendidas: 0, recusadas: 0 };
 
   all.forEach(function (r) {
-    if (r.CRIADO_EM.slice(0, 10) === hoje) {
+    if (localDay_(r.CRIADO_EM) === hoje) {
       stats.total++;
       if (r.STATUS === 'PENDENTE') stats.pendentes++;
       if (r.STATUS === 'ATENDIDA') stats.atendidas++;
@@ -395,9 +420,7 @@ function apiResolver(token, o) {
   if (analise !== 'ACEITA' && analise !== 'RECUSADA') return { ok: false, erro: 'Análise inválida.' };
   if (analise === 'RECUSADA' && !s_(o.motivoRecusa)) return { ok: false, erro: 'Informe o motivo padronizado da recusa.' };
 
-  var lock = LockService.getScriptLock();
-  lock.waitLock(20000);
-  try {
+  return withLock_(function () {
     var sh = sheet_(SH.SOL);
     var all = rowsAsObjects_(sh, SOL_HEADERS);
     for (var i = 0; i < all.length; i++) {
@@ -426,9 +449,7 @@ function apiResolver(token, o) {
       return { ok: true };
     }
     return { ok: false, erro: 'Solicitação não encontrada.' };
-  } finally {
-    lock.releaseLock();
-  }
+  });
 }
 
 function apiHistorico(token, f) {
@@ -437,7 +458,7 @@ function apiHistorico(token, f) {
   var mes = s_(f.mes), status = s_(f.status), busca = s_(f.busca).toLowerCase();
   var itens = rowsAsObjects_(sheet_(SH.SOL), SOL_HEADERS)
     .filter(function (r) {
-      if (mes && r.CRIADO_EM.slice(0, 7) !== mes) return false;
+      if (mes && localMonth_(r.CRIADO_EM) !== mes) return false;
       if (status && r.STATUS !== status) return false;
       if (busca) {
         var alvo = (r.PACIENTE + ' ' + r.PRONTUARIO + ' ' + r.ID).toLowerCase();
@@ -454,7 +475,7 @@ function apiRelatorio(token, mes) {
   if (!auth_(token)) return { ok: false, erro: 'Sessão expirada.' };
   mes = s_(mes);
   var itens = rowsAsObjects_(sheet_(SH.SOL), SOL_HEADERS)
-    .filter(function (r) { return !mes || r.CRIADO_EM.slice(0, 7) === mes; });
+    .filter(function (r) { return !mes || localMonth_(r.CRIADO_EM) === mes; });
 
   var rel = {
     ok: true, mes: mes, total: itens.length,
@@ -504,9 +525,7 @@ function apiSalvarUsuario(token, o) {
   o = o || {};
   var nome = s_(o.nome).toUpperCase(), loginName = s_(o.login).toLowerCase(), perfil = s_(o.perfil) === 'ADMIN' ? 'ADMIN' : 'NUTRICAO';
   if (!nome || !loginName) return { ok: false, erro: 'Nome e login são obrigatórios.' };
-  var lock = LockService.getScriptLock();
-  lock.waitLock(20000);
-  try {
+  return withLock_(function () {
     var sh = sheet_(SH.USU);
     var users = rowsAsObjects_(sh, USU_HEADERS);
 
@@ -539,9 +558,7 @@ function apiSalvarUsuario(token, o) {
     sh.appendRow([id, nome, loginName, hash_(senha, salt2), salt2, perfil, 'SIM', 'SIM', '', '']);
     audit_(adm, 'USUARIO_CRIADO', 'Usuário criado: ' + loginName + ' (' + nome + '), perfil ' + perfil + '.');
     return { ok: true };
-  } finally {
-    lock.releaseLock();
-  }
+  });
 }
 
 var LISTAS_EDITAVEIS = ['CLINICA', 'CATEGORIA', 'MOTIVO_SUSPENSAO', 'MAMADEIRA', 'CONSISTENCIA', 'MOTIVO_RECUSA'];
@@ -562,9 +579,7 @@ function apiSalvarLista(token, tipo, valores) {
   valores = (valores || []).map(s_).filter(function (v) { return !!v; });
   if (!valores.length) return { ok: false, erro: 'A lista não pode ficar vazia.' };
 
-  var lock = LockService.getScriptLock();
-  lock.waitLock(20000);
-  try {
+  return withLock_(function () {
     var sh = sheet_(SH.LIS);
     var last = sh.getLastRow();
     var keep = [];
@@ -589,9 +604,7 @@ function apiSalvarLista(token, tipo, valores) {
     removidos.forEach(function (v) { audit_(adm, 'LISTA_ITEM_REMOVIDO', LNOMES_[tipo] + ': "' + v + '".'); });
     cacheInvalidate_('listas');
     return { ok: true };
-  } finally {
-    lock.releaseLock();
-  }
+  });
 }
 
 var LNOMES_ = { CLINICA: 'Clínicas', CATEGORIA: 'Categorias profissionais', MOTIVO_SUSPENSAO: 'Motivos de suspensão', MAMADEIRA: 'Mamadeiras e bicos', CONSISTENCIA: 'Consistências', MOTIVO_RECUSA: 'Motivos padronizados de recusa' };
@@ -602,9 +615,7 @@ function apiSalvarSla(token, minutos) {
   var n = parseInt(minutos, 10);
   if (!(n > 0 && n <= 720)) return { ok: false, erro: 'Informe um SLA entre 1 e 720 minutos.' };
 
-  var lock = LockService.getScriptLock();
-  lock.waitLock(20000);
-  try {
+  return withLock_(function () {
     var sh = sheet_(SH.LIS);
     var last = sh.getLastRow();
     var anterior = slaMin_();
@@ -621,9 +632,7 @@ function apiSalvarSla(token, minutos) {
     audit_(adm, 'SLA_ALTERADO', 'SLA alterado de ' + anterior + ' para ' + n + ' minutos.');
     cacheInvalidate_('listas');
     return { ok: true };
-  } finally {
-    lock.releaseLock();
-  }
+  });
 }
 
 function apiAuditoria(token, busca) {
