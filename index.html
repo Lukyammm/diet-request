@@ -612,9 +612,13 @@ function nextStep(){
   collect(); if(!validar())return;
   /* Ao sair da identificação, dispara em segundo plano a checagem de alta
      recente para o prontuário — sem bloquear a navegação. O resultado
-     aparece como aviso no passo do Solicitante, quando (e se) chegar lá. */
-  if(STEP===2 && F.prontuario && F.tipo!=='AVISO DE ALTA') iniciarChecagemAlta(F.prontuario);
-  else ALTA_CHECK=null;
+     aparece como aviso no passo do Solicitante, quando (e se) chegar lá.
+     nextStep() também roda ao sair do passo 3 (Detalhes) — nesse caso não
+     mexe no ALTA_CHECK, só o passo 2 decide se inicia ou limpa a checagem. */
+  if(STEP===2){
+    if(F.prontuario && F.tipo!=='AVISO DE ALTA') iniciarChecagemAlta(F.prontuario);
+    else ALTA_CHECK=null;
+  }
   advanceStep();
 }
 function iniciarChecagemAlta(prontuario){
