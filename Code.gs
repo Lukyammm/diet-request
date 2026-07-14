@@ -54,7 +54,7 @@ function doGet(e) {
   var t = HtmlService.createTemplateFromFile('index');
   t.mode = (e && e.parameter && e.parameter.view) ? String(e.parameter.view) : '';
   return t.evaluate()
-    .setTitle('Maná')
+    .setTitle('NutriSim')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1, maximum-scale=1')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
