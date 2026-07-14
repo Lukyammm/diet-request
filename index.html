@@ -16,6 +16,7 @@
   --blue:#2b6cb0; --blue-s:#e6eef7; --purple:#6b4fa3; --purple-s:#eee9f6;
   --teal:#0b6b74; --teal-s:#dbeef0;
   --r:12px; --sh:0 1px 2px rgba(29,42,36,.06),0 4px 14px rgba(29,42,36,.05);
+  --sh-lift:0 6px 16px rgba(29,42,36,.10),0 2px 5px rgba(29,42,36,.06);
   --disp:'Inter',system-ui,sans-serif; --body:'Inter',system-ui,sans-serif;
   --mono:ui-monospace,'SF Mono',Menlo,Consolas,monospace;
   /* alvo mínimo de toque (Apple HIG 44 / Material 48) */
@@ -99,13 +100,30 @@ hr.sep{border:0;border-top:1px solid var(--line);margin:16px 0}
 .steps span{flex:1;height:4px;border-radius:99px;background:var(--line)}
 .steps span.on{background:var(--pri)}
 .steplabel{display:flex;justify-content:space-between;color:var(--mut);font-size:11.5px;letter-spacing:.05em;text-transform:uppercase;font-weight:600;margin-bottom:6px}
-.tipos{display:grid;gap:10px}
-.tipocard{display:flex;gap:14px;align-items:flex-start;text-align:left;background:#fff;border:1px solid var(--line);border-left:5px solid var(--line);border-radius:var(--r);padding:15px 16px;transition:.12s;width:100%}
-.tipocard:hover{border-color:var(--mut);border-left-width:5px}
-.tipocard.on{border-color:var(--pri);box-shadow:0 0 0 3px rgba(14,122,95,.12)}
-.tipocard .n{font-family:var(--disp);font-weight:700;font-size:18px;color:var(--mut);flex:0 0 auto;width:22px}
-.tipocard b{display:block;font-size:15.5px}
-.tipocard small{color:var(--mut);font-size:13px;line-height:1.4;display:block;margin-top:2px}
+/* seleção de tipo: grade 2×3 de cards (ícone + título + subtítulo), sem números */
+.tipogrid{display:grid;grid-template-columns:1fr 1fr;gap:12px;max-width:420px;margin:0 auto}
+.tile{position:relative;display:flex;flex-direction:column;align-items:center;text-align:center;gap:12px;background:#fff;border:1.5px solid var(--line);border-radius:16px;padding:22px 14px 18px;min-height:176px;width:100%;transition:transform .16s ease,box-shadow .16s ease,border-color .16s ease;box-shadow:var(--sh)}
+.tile:hover{border-color:var(--mut);transform:translateY(-3px);box-shadow:var(--sh-lift)}
+.tile:active{transform:translateY(-1px)}
+.tile .chip{width:60px;height:60px;border-radius:16px;display:grid;place-items:center;transition:.16s}
+.tile .chip svg{width:34px;height:34px;stroke-width:1.85}
+.tile:hover .chip{transform:scale(1.05)}
+.tile b{font-size:14.5px;font-weight:600;line-height:1.25}
+.tile small{font-size:12px;color:var(--mut);line-height:1.35;margin-top:-4px}
+.tile .check{position:absolute;top:9px;right:9px;width:20px;height:20px;border-radius:50%;display:none;place-items:center;color:#fff}
+.tile .check svg{width:12px;height:12px;stroke-width:3}
+.tile.on .check{display:grid}
+.k1 .chip{background:var(--pri-s);color:var(--pri-d)} .k1.on{border-color:var(--pri);box-shadow:0 0 0 3px rgba(14,122,95,.14)} .k1 .check{background:var(--pri)}
+.k2 .chip{background:var(--red-s);color:var(--red)} .k2.on{border-color:var(--red);box-shadow:0 0 0 3px rgba(179,64,46,.14)} .k2 .check{background:var(--red)}
+.k3 .chip{background:var(--amber-s);color:var(--amber)} .k3.on{border-color:var(--amber);box-shadow:0 0 0 3px rgba(160,110,18,.14)} .k3 .check{background:var(--amber)}
+.k4 .chip{background:var(--purple-s);color:var(--purple)} .k4.on{border-color:var(--purple);box-shadow:0 0 0 3px rgba(107,79,163,.14)} .k4 .check{background:var(--purple)}
+.k5 .chip{background:var(--blue-s);color:var(--blue)} .k5.on{border-color:var(--blue);box-shadow:0 0 0 3px rgba(43,108,176,.14)} .k5 .check{background:var(--blue)}
+.k6 .chip{background:var(--teal-s);color:var(--teal)} .k6.on{border-color:var(--teal);box-shadow:0 0 0 3px rgba(11,107,116,.14)} .k6 .check{background:var(--teal)}
+/* transição suave entre passos do formulário */
+@keyframes stepInR{from{opacity:0;transform:translateX(16px)}to{opacity:1;transform:none}}
+@keyframes stepInL{from{opacity:0;transform:translateX(-16px)}to{opacity:1;transform:none}}
+.stepfwd{animation:stepInR .28s cubic-bezier(.4,0,.2,1)}
+.stepback{animation:stepInL .28s cubic-bezier(.4,0,.2,1)}
 .t1{border-left-color:var(--pri)!important}.t2{border-left-color:var(--red)!important}
 .t3{border-left-color:var(--amber)!important}.t4{border-left-color:var(--purple)!important}
 .t5{border-left-color:var(--blue)!important}.t6{border-left-color:var(--teal)!important}
@@ -271,6 +289,20 @@ var TIPO_DESC = [
   'Preparo para exame com manitol — suco de laranja 500 ml para via oral.',
   'Sinaliza à nutrição que o paciente recebeu alta hospitalar.'
 ];
+/* Subtítulos curtos exibidos nos cards de seleção do tipo. */
+var TIPO_SUB = ['Início ou retorno da dieta','Interromper a dieta em curso','Prescrição foi alterada','Teste da fonoaudiologia','Manitol · suco de laranja','Paciente recebeu alta'];
+/* Ícones de linha (um por tipo), tintados pela cor do tipo via CSS. */
+var TIPO_ICON = [
+  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M4 3v7a2 2 0 0 0 2 2h0a2 2 0 0 0 2-2V3"/><path d="M6 12v9"/><path d="M18 3c-1.7 0-3 2-3 5s.6 4 2 4v9"/><path d="M17 3v6"/></svg>',
+  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>',
+  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4h6v3H9z"/><path d="M8.5 12h5"/><path d="m12 10.5 1.5 1.5-1.5 1.5"/><path d="M15.5 16h-5"/><path d="m12 14.5-1.5 1.5 1.5 1.5"/></svg>',
+  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2h6"/><path d="M10 2v3H9a2 2 0 0 0-2 2v13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V7a2 2 0 0 0-2-2h-1V2"/><path d="M8 11h8"/><path d="M8 15h8"/></svg>',
+  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6"/><path d="M10 3v6l-4.5 8.5A2 2 0 0 0 7.3 21h9.4a2 2 0 0 0 1.8-2.9L14 9V3"/><path d="M7.5 15h9"/></svg>',
+  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="7" r="3.2"/><path d="M3.5 21v-1.5A4.5 4.5 0 0 1 8 15h2a4.5 4.5 0 0 1 3 1.1"/><path d="m15.5 18.5 2 2 3.5-4"/></svg>'
+];
+var CHECK_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
+/* Direção da transição entre passos (1 = avança, -1 = volta). */
+var STEP_DIR = 1;
 
 function $(q,el){ return (el||document).querySelector(q); }
 function $$(q,el){ return [].slice.call((el||document).querySelectorAll(q)); }
@@ -345,7 +377,7 @@ function goPublic(){
   clearTimers();
   $('#v-app').classList.add('hide');
   $('#v-pub').classList.remove('hide');
-  F={}; STEP=1; renderWizard();
+  F={}; STEP=1; STEP_DIR=1; renderWizard();
 }
 
 function renderWizard(){
@@ -363,22 +395,26 @@ function renderWizard(){
 
   var nav='';
   if(STEP>1) nav+='<button class="btn ghost" onclick="prevStep()">Voltar</button>';
-  if(STEP<4) nav+='<button class="btn grow" id="nextbtn" onclick="nextStep()">Continuar</button>';
-  else nav+='<button class="btn grow" id="sendbtn" onclick="enviar()">Enviar solicitação</button>';
+  /* No passo 1 não há "Continuar": tocar num card já avança para o paciente. */
+  if(STEP>1 && STEP<4) nav+='<button class="btn grow" id="nextbtn" onclick="nextStep()">Continuar</button>';
+  else if(STEP===4) nav+='<button class="btn grow" id="sendbtn" onclick="enviar()">Enviar solicitação</button>';
 
   host.innerHTML =
     '<h1 style="font-size:clamp(21px,5.5vw,24px);margin:4px 0 4px">Nova solicitação</h1>'+
     '<p class="muted small mb">Preencha os dados e a nutrição recebe na hora, com acompanhamento no painel.</p>'+
-    head+'<div class="card pad">'+body+'</div>'+
-    '<div class="row mt">'+nav+'</div>';
+    head+'<div class="card pad '+(STEP_DIR<0?'stepback':'stepfwd')+'">'+body+'</div>'+
+    (nav?'<div class="row mt">'+nav+'</div>':'');
   bindStep();
   window.scrollTo({top:0});
 }
 
 function step1(){
-  return '<div class="tipos">'+TIPOS.map(function(t,i){
-    return '<button type="button" class="tipocard t'+(i+1)+(F.tipo===t?' on':'')+'" onclick="pickTipo('+i+')">'+
-      '<span class="n">'+(i+1)+'</span><span><b>'+esc(t.charAt(0)+t.slice(1).toLowerCase())+'</b><small>'+esc(TIPO_DESC[i])+'</small></span></button>';
+  return '<div class="tipogrid">'+TIPOS.map(function(t,i){
+    return '<button type="button" class="tile k'+(i+1)+(F.tipo===t?' on':'')+'" onclick="pickTipo('+i+')">'+
+      '<span class="check">'+CHECK_SVG+'</span>'+
+      '<span class="chip">'+TIPO_ICON[i]+'</span>'+
+      '<b>'+esc(t.charAt(0)+t.slice(1).toLowerCase())+'</b><small>'+esc(TIPO_SUB[i])+'</small>'+
+    '</button>';
   }).join('')+'</div>';
 }
 /* Campos específicos de cada tipo: são limpos ao trocar o tipo para não
@@ -388,7 +424,7 @@ var CAMPOS_TIPO=['horarioPrescricao','tipoDieta','prescricao','comorb','comorbOu
 function pickTipo(i){
   var novo=TIPOS[i];
   if(F.tipo && F.tipo!==novo) CAMPOS_TIPO.forEach(function(k){ delete F[k]; });
-  F.tipo=novo; STEP=2; renderWizard();
+  F.tipo=novo; STEP=2; STEP_DIR=1; renderWizard();
 }
 
 function fld(id,label,type,attrs,hint){
@@ -553,7 +589,7 @@ function validar(){
   return true;
 }
 
-function advanceStep(){ STEP++; renderWizard(); }
+function advanceStep(){ STEP++; STEP_DIR=1; renderWizard(); }
 function nextStep(){
   collect(); if(!validar())return;
   /* Ao sair da identificação, verifica se o prontuário teve alta recente e
@@ -584,7 +620,7 @@ function confirmAltaRecente(r){
       '<button class="btn" onclick="closeModal();advanceStep()">Sim, continuar</button>'+
     '</div>');
 }
-function prevStep(){ collect(); STEP--; if(STEP<1)STEP=1; renderWizard(); }
+function prevStep(){ collect(); STEP--; if(STEP<1)STEP=1; STEP_DIR=-1; renderWizard(); }
 
 function enviar(){
   collect(); if(!validar())return;
