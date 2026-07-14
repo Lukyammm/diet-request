@@ -14,6 +14,7 @@
   --pri:#0e7a5f; --pri-d:#0a5a46; --pri-s:#e3f0ea;
   --red:#b3402e; --red-s:#f7e8e5; --amber:#a06e12; --amber-s:#f7efdd;
   --blue:#2b6cb0; --blue-s:#e6eef7; --purple:#6b4fa3; --purple-s:#eee9f6;
+  --teal:#0b6b74; --teal-s:#dbeef0;
   --r:12px; --sh:0 1px 2px rgba(29,42,36,.06),0 4px 14px rgba(29,42,36,.05);
   --disp:'Inter',system-ui,sans-serif; --body:'Inter',system-ui,sans-serif;
   --mono:ui-monospace,'SF Mono',Menlo,Consolas,monospace;
@@ -107,12 +108,12 @@ hr.sep{border:0;border-top:1px solid var(--line);margin:16px 0}
 .tipocard small{color:var(--mut);font-size:13px;line-height:1.4;display:block;margin-top:2px}
 .t1{border-left-color:var(--pri)!important}.t2{border-left-color:var(--red)!important}
 .t3{border-left-color:var(--amber)!important}.t4{border-left-color:var(--purple)!important}
-.t5{border-left-color:var(--blue)!important}
+.t5{border-left-color:var(--blue)!important}.t6{border-left-color:var(--teal)!important}
 
 .badge{display:inline-flex;align-items:center;border-radius:999px;padding:3px 11px;font-size:11.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
 .b1{background:var(--pri-s);color:var(--pri-d)}.b2{background:var(--red-s);color:var(--red)}
 .b3{background:var(--amber-s);color:var(--amber)}.b4{background:var(--purple-s);color:var(--purple)}
-.b5{background:var(--blue-s);color:var(--blue)}
+.b5{background:var(--blue-s);color:var(--blue)}.b6{background:var(--teal-s);color:var(--teal)}
 .bok{background:var(--pri-s);color:var(--pri-d)}.bwarn{background:var(--amber-s);color:var(--amber)}
 .blate{background:var(--red-s);color:var(--red)}.bneutral{background:#eef1ee;color:var(--mut)}
 
@@ -235,7 +236,7 @@ body.tv{background:#0f1512;color:#e8efe9}
   <div class="in">
     <a class="brand" href="#" onclick="goPublic();return false;">
       <span class="dot" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m8.3 12.4 2.6 2.6 4.8-5.4"/></svg></span>
-      <span><b>Solicitação de Dieta</b><small>Serviço de Nutrição</small></span>
+      <span><b>Maná</b><small>Serviço de Nutrição</small></span>
     </a>
     <div class="top-right">
       <span class="userchip" id="userchip"><span class="av" id="uav"></span><span id="unome"></span></span>
@@ -260,14 +261,15 @@ body.tv{background:#0f1512;color:#e8efe9}
 <script>
 /* ================= núcleo ================= */
 var MODE = '<?= mode ?>';
-var S = { token:null, user:null, boot:null, tab:'pend', pend:[], motivosRecusa:[], slaMin:30, timers:[] };
-var TIPOS = ['LIBERAÇÃO DE DIETA','SUSPENSÃO DE DIETA','MUDANÇA DE PRESCRIÇÃO','DIETA TESTE-FONO','PREPARO PARA EXAMES'];
+var S = { token:null, user:null, boot:null, tab:'pend', pend:[], motivosRecusa:[], slaMin:30, slaMap:{}, timers:[] };
+var TIPOS = ['SOLICITAÇÃO DE DIETA','SUSPENSÃO DE DIETA','MUDANÇA DE PRESCRIÇÃO','DIETA TESTE-FONO','PREPARO PARA EXAMES','AVISO DE ALTA'];
 var TIPO_DESC = [
   'Início ou retorno da dieta (oral, enteral ou mista) conforme prescrição médica.',
   'Interromper a dieta em curso: vômito, perda de sonda, exame, cirurgia, alta…',
   'A prescrição médica da dieta foi alterada.',
   'Envio de dieta para teste da fonoaudiologia (mamadeiras, bicos, espessamento).',
-  'Preparo para exame com manitol — suco de laranja 500 ml para via oral.'
+  'Preparo para exame com manitol — suco de laranja 500 ml para via oral.',
+  'Sinaliza à nutrição que o paciente recebeu alta hospitalar.'
 ];
 
 function $(q,el){ return (el||document).querySelector(q); }
@@ -307,7 +309,7 @@ function clearTimers(){ S.timers.forEach(clearInterval); S.timers=[]; }
 
 function tipoIdx(t){ var i=TIPOS.indexOf(t); return i<0?0:i; }
 function tipoClass(t){ return 't'+(tipoIdx(t)+1); }
-function tipoBadge(t){ var i=tipoIdx(t); var nm=['Liberação','Suspensão','Mudança','Teste-fono','Preparo exame'][i]; return '<span class="badge b'+(i+1)+'">'+nm+'</span>'; }
+function tipoBadge(t){ var i=tipoIdx(t); var nm=['Solicitação','Suspensão','Mudança','Teste-fono','Preparo exame','Aviso de alta'][i]; return '<span class="badge b'+(i+1)+'">'+nm+'</span>'; }
 
 function fmtDT(iso){
   if(!iso) return '—';
@@ -317,7 +319,8 @@ function fmtDT(iso){
 }
 function elapsedMin(iso){ return Math.max(0,Math.floor((Date.now()-new Date(iso).getTime())/60000)); }
 function fmtMin(m){ m=Number(m)||0; if(m<60)return m+' min'; var h=Math.floor(m/60); return h+'h'+('0'+(m%60)).slice(-2); }
-function slaClass(min){ var s=S.slaMin||30; if(min>s)return 'late'; if(min>=s*0.6)return 'warn'; return 'ok'; }
+function slaOf(clinica){ var m=clinica&&S.slaMap&&S.slaMap[String(clinica).toUpperCase()]; return m>0?m:(S.slaMin||30); }
+function slaClass(min,clinica){ var s=slaOf(clinica); if(min>s)return 'late'; if(min>=s*0.6)return 'warn'; return 'ok'; }
 
 function saveTok(t){ try{ localStorage.setItem('sd_token',t||''); }catch(e){} }
 function loadTok(){ try{ return localStorage.getItem('sd_token')||''; }catch(e){ return ''; } }
@@ -379,9 +382,9 @@ function step1(){
   }).join('')+'</div>';
 }
 /* Campos específicos de cada tipo: são limpos ao trocar o tipo para não
-   "vazar" um valor antigo (ex.: prescrição de uma LIBERAÇÃO) para o registro
+   "vazar" um valor antigo (ex.: prescrição de uma SOLICITAÇÃO) para o registro
    de outro tipo, já que o servidor grava todos os campos enviados. */
-var CAMPOS_TIPO=['horarioPrescricao','tipoDieta','prescricao','comorb','comorbOutras','espessada','consistencia','espessanteAgua','qtdEnteral','motivoSuspensao','novaPrescricao','mamadeira','espessamento','viaOral','solicFono','obs'];
+var CAMPOS_TIPO=['horarioPrescricao','tipoDieta','prescricao','comorb','comorbOutras','espessada','consistencia','espessanteAgua','motivoSuspensao','novaPrescricao','mamadeira','espessamento','viaOral','solicFono','obs','orientacaoAlta','dataAlta','horarioAlta'];
 function pickTipo(i){
   var novo=TIPOS[i];
   if(F.tipo && F.tipo!==novo) CAMPOS_TIPO.forEach(function(k){ delete F[k]; });
@@ -411,7 +414,7 @@ function seg(id,label,opts,hint){
 function step2(){
   return '<span class="'+'badge b'+(tipoIdx(F.tipo)+1)+'">'+esc(F.tipo)+'</span><hr class="sep">'+
     fld('paciente','Nome completo do paciente')+
-    '<div class="grid2">'+fld('prontuario','Prontuário')+fld('nascimento','Data de nascimento','date')+'</div>'+
+    '<div class="grid2">'+fld('prontuario','Prontuário')+fld('nascimento','Data de nascimento','date','','opcional')+'</div>'+
     sel('clinica','Clínica',S.boot.clinicas)+
     '<div class="grid2">'+fld('enfermariaLeito','Enfermaria e leito','text','placeholder="Ex.: ENF 3 — LEITO 12"')+
     '<div>'+seg('isolamento','Leito em isolamento?',['SIM','NÃO'])+'</div></div>';
@@ -420,7 +423,7 @@ function step2(){
 function step3(){
   var t=tipoIdx(F.tipo), h='';
   if(t===0){
-    h+=fld('horarioPrescricao','Horário da prescrição','time')+
+    h+=fld('horarioPrescricao','Horário desejado para entrega da dieta','time')+
        seg('tipoDieta','Tipo de dieta',['ORAL','ENTERAL','MISTA'])+
        area('prescricao','Prescrição médica da dieta','','Ex.: Dieta branda hipossódica…')+
        '<div id="cond-oral" class="hide">'+
@@ -430,18 +433,16 @@ function step3(){
          seg('espessada','Dieta espessada?',['SIM','NÃO'])+
          '<div id="cond-esp" class="hide">'+sel('consistencia','Consistência da dieta espessada',S.boot.consistencias)+'</div>'+
          seg('espessanteAgua','Espessante para água?',['SIM','NÃO'])+
-       '</div>'+
-       '<div id="cond-ent" class="hide">'+fld('qtdEnteral','Quantidade de dieta enteral','text','placeholder="Ex.: 6 × 300 ml"')+'</div>';
+       '</div>';
   }
   if(t===1){
     h+=sel('motivoSuspensao','Motivo da suspensão',S.boot.motivosSuspensao)+
        area('obs','Observações','opcional');
   }
   if(t===2){
-    h+=fld('horarioPrescricao','Horário da nova prescrição','time')+
+    h+=fld('horarioPrescricao','Horário do envio do novo volume','time')+
        area('novaPrescricao','Nova prescrição médica')+
-       seg('tipoDieta','Tipo de dieta',['ORAL','ENTERAL','MISTA'])+
-       '<div id="cond-ent" class="hide">'+fld('qtdEnteral','Quantidade de dieta enteral','text','placeholder="Ex.: 6 × 300 ml"')+'</div>';
+       seg('tipoDieta','Tipo de dieta',['ORAL','ENTERAL','MISTA']);
   }
   if(t===3){
     h+=sel('mamadeira','Mamadeira / bico',S.boot.mamadeiras)+
@@ -453,6 +454,12 @@ function step3(){
   if(t===4){
     h+=seg('viaOral','O paciente é de via oral?',['SIM','NÃO'])+
        '<div id="cond-suco" class="callout hide" style="margin:-4px 0 15px">Será enviado <b>suco de laranja (500 ml)</b> para o preparo com manitol.</div>'+
+       '<div id="cond-nosuco" class="callout hide" style="margin:-4px 0 15px;background:var(--amber-s);color:var(--amber);border-color:rgba(160,110,18,.25)">O suco de laranja (500 ml) só é enviado para pacientes de via oral. Como este paciente não é via oral, <b>nenhum suco será encaminhado</b>.</div>'+
+       area('obs','Observações','opcional');
+  }
+  if(t===5){
+    h+=seg('orientacaoAlta','Precisa de orientação da nutrição na alta?',['SIM','NÃO'])+
+       '<div class="grid2">'+fld('dataAlta','Data da alta','date')+fld('horarioAlta','Horário da alta','time')+'</div>'+
        area('obs','Observações','opcional');
   }
   return '<span class="badge b'+(t+1)+'">'+esc(F.tipo)+'</span><hr class="sep">'+h;
@@ -469,12 +476,14 @@ function resumo(){
   var linhas=[
     ['Tipo',F.tipo],['Paciente',F.paciente],['Prontuário',F.prontuario],['Nascimento',F.nascimento],
     ['Clínica',F.clinica],['Enfermaria/leito',F.enfermariaLeito],['Isolamento',F.isolamento],
-    ['Horário da prescrição',F.horarioPrescricao],['Tipo de dieta',F.tipoDieta],['Prescrição',F.prescricao],
-    ['Comorbidades',montaComorb()],['Qtd. enteral',F.qtdEnteral],
+    ['Horário desejado',F.horarioPrescricao],['Tipo de dieta',F.tipoDieta],['Prescrição',F.prescricao],
+    ['Comorbidades',montaComorb()],
     ['Dieta espessada',F.espessada],['Consistência',F.consistencia],['Espessante p/ água',F.espessanteAgua],
     ['Motivo da suspensão',F.motivoSuspensao],['Nova prescrição',F.novaPrescricao],
     ['Mamadeira/bico',F.mamadeira],['Espessamento',F.espessamento],
-    ['Via oral',F.viaOral],['Solicitações da fono',F.solicFono],['Observações',F.obs||F.obsGeral]
+    ['Via oral',F.viaOral],['Solicitações da fono',F.solicFono],
+    ['Orientação na alta',F.orientacaoAlta],['Data da alta',F.dataAlta],['Horário da alta',F.horarioAlta],
+    ['Observações',F.obs||F.obsGeral]
   ].filter(function(l){return l[1];});
   return '<dl class="dl">'+linhas.map(function(l){return '<dt>'+l[0]+'</dt><dd>'+esc(l[1])+'</dd>';}).join('')+'</dl>';
 }
@@ -511,11 +520,11 @@ function bindStep(){
 }
 
 function condicionais(){
-  var oral=$('#cond-oral'), ent=$('#cond-ent'), esp=$('#cond-esp'), suco=$('#cond-suco');
+  var oral=$('#cond-oral'), esp=$('#cond-esp'), suco=$('#cond-suco'), nosuco=$('#cond-nosuco');
   if(oral) oral.classList.toggle('hide', !(F.tipoDieta==='ORAL'||F.tipoDieta==='MISTA'));
-  if(ent) ent.classList.toggle('hide', !(F.tipoDieta==='ENTERAL'||F.tipoDieta==='MISTA'));
   if(esp) esp.classList.toggle('hide', !(F.espessada==='SIM'||F.espessamento==='SIM'));
   if(suco) suco.classList.toggle('hide', F.viaOral!=='SIM');
+  if(nosuco) nosuco.classList.toggle('hide', F.viaOral!=='NÃO');
 }
 
 function collect(){
@@ -535,6 +544,7 @@ function validar(){
     if(t===2) need=[['novaPrescricao','nova prescrição']];
     if(t===3) need=[['mamadeira','mamadeira / bico']];
     if(t===4) need=[['viaOral','via oral (sim ou não)']];
+    if(t===5) need=[['orientacaoAlta','se precisa de orientação na alta'],['dataAlta','data da alta'],['horarioAlta','horário da alta']];
   }
   if(STEP===4) need=[['categoria','categoria do profissional'],['profissional','nome do profissional']];
   for(var i=0;i<need.length;i++){
@@ -543,7 +553,37 @@ function validar(){
   return true;
 }
 
-function nextStep(){ collect(); if(!validar())return; STEP++; renderWizard(); }
+function advanceStep(){ STEP++; renderWizard(); }
+function nextStep(){
+  collect(); if(!validar())return;
+  /* Ao sair da identificação, verifica se o prontuário teve alta recente e
+     avisa antes de prosseguir — exceto quando a própria solicitação é um
+     Aviso de Alta. Falha de rede não bloqueia o fluxo. */
+  if(STEP===2 && F.prontuario && F.tipo!=='AVISO DE ALTA'){
+    var btn=$('#nextbtn'); busy(btn,true,'Verificando…');
+    rpc('pubAltaRecente',F.prontuario).then(function(r){
+      busy(btn,false);
+      if(r&&r.ok&&r.alta) confirmAltaRecente(r); else advanceStep();
+    }).catch(function(){ busy(btn,false); advanceStep(); });
+    return;
+  }
+  advanceStep();
+}
+function confirmAltaRecente(r){
+  var quando = r.dataAlta ? ('Alta informada em '+esc(r.dataAlta)+(r.horarioAlta?' às '+esc(r.horarioAlta):'')+'.')
+                          : ('Aviso de alta registrado em '+fmtDT(r.criadoEm)+'.');
+  openModal(
+    '<div class="mh"><h3>Paciente com alta recente</h3></div>'+
+    '<div class="mb">'+
+      '<p>O paciente <b>'+esc(r.paciente||F.paciente)+'</b> (prontuário '+esc(F.prontuario)+') recebeu um <b>Aviso de Alta</b> nos últimos 7 dias.</p>'+
+      '<p class="muted small mt">'+quando+'</p>'+
+      '<p class="mt">Tem certeza de que deseja continuar com esta solicitação?</p>'+
+    '</div>'+
+    '<div class="mf">'+
+      '<button class="btn ghost" onclick="closeModal();goPublic()">Não, encerrar</button>'+
+      '<button class="btn" onclick="closeModal();advanceStep()">Sim, continuar</button>'+
+    '</div>');
+}
 function prevStep(){ collect(); STEP--; if(STEP<1)STEP=1; renderWizard(); }
 
 function enviar(){
@@ -553,11 +593,12 @@ function enviar(){
     clinica:F.clinica, enfermariaLeito:F.enfermariaLeito, isolamento:F.isolamento,
     profissional:F.profissional, categoria:F.categoria,
     horarioPrescricao:F.horarioPrescricao, tipoDieta:F.tipoDieta, prescricao:F.prescricao,
-    comorbidades:montaComorb(), qtdEnteral:F.qtdEnteral,
+    comorbidades:montaComorb(),
     espessada:F.espessada, consistencia:F.consistencia, espessanteAgua:F.espessanteAgua,
     motivoSuspensao:F.motivoSuspensao, novaPrescricao:F.novaPrescricao,
     mamadeira:F.mamadeira, espessamento:F.espessamento,
-    viaOral:F.viaOral, solicFono:F.solicFono, obs:F.obs||F.obsGeral
+    viaOral:F.viaOral, solicFono:F.solicFono, obs:F.obs||F.obsGeral,
+    orientacaoAlta:F.orientacaoAlta, dataAlta:F.dataAlta, horarioAlta:F.horarioAlta
   };
   busy($('#sendbtn'),true);
   rpc('pubCriar',payload).then(function(r){
@@ -692,7 +733,7 @@ function authGuard(r){
 function viewPend(){
   rpc('apiPendentes',S.token).then(function(r){
     if(!authGuard(r))return;
-    S.pend=r.itens; S.motivosRecusa=r.motivosRecusa; S.slaMin=r.slaMin;
+    S.pend=r.itens; S.motivosRecusa=r.motivosRecusa; S.slaMin=r.slaMin; S.slaMap=r.slaClinicas||{};
     $('#apptitle').innerHTML='Pendências <span class="count">'+r.itens.length+'</span>';
     var body=$('#appbody');
     if(!r.itens.length){
@@ -705,14 +746,14 @@ function viewPend(){
         '<div class="top">'+tipoBadge(it.TIPO)+'<span class="id">'+esc(it.ID)+'</span></div>'+
         '<b>'+esc(it.PACIENTE)+'</b>'+
         '<div class="loc">'+esc(it.CLINICA)+' · '+esc(it.ENFERMARIA_LEITO)+(it.ISOLAMENTO==='SIM'?' · <b style="color:var(--red)">ISOLAMENTO</b>':'')+'</div>'+
-        '<span class="tchip b'+slaClass(m)+'" data-tick="'+esc(it.CRIADO_EM)+'">'+fmtMin(m)+'</span>'+
+        '<span class="tchip b'+slaClass(m,it.CLINICA)+'" data-tick="'+esc(it.CRIADO_EM)+'" data-clinica="'+esc(it.CLINICA)+'">'+fmtMin(m)+'</span>'+
       '</div>';
     }).join('')+'</div>';
     var tick=setInterval(function(){
       $$('[data-tick]').forEach(function(el){
         var m=elapsedMin(el.dataset.tick);
         el.textContent=fmtMin(m);
-        el.className='tchip b'+slaClass(m);
+        el.className='tchip b'+slaClass(m,el.dataset.clinica);
       });
     },30000);
     S.timers.push(tick);
@@ -723,12 +764,13 @@ var CAMPOS_DET=[
   ['CRIADO_EM','Solicitado em','dt'],['PACIENTE','Paciente'],['PRONTUARIO','Prontuário'],['NASCIMENTO','Nascimento'],
   ['CLINICA','Clínica'],['ENFERMARIA_LEITO','Enfermaria/leito'],['ISOLAMENTO','Isolamento'],
   ['PROFISSIONAL','Solicitante'],['CATEGORIA','Categoria'],
-  ['HORARIO_PRESCRICAO','Horário da prescrição'],['TIPO_DIETA','Tipo de dieta'],['PRESCRICAO','Prescrição'],
-  ['COMORBIDADES','Comorbidades'],['QTD_ENTERAL','Qtd. enteral'],
+  ['HORARIO_PRESCRICAO','Horário desejado'],['TIPO_DIETA','Tipo de dieta'],['PRESCRICAO','Prescrição'],
+  ['COMORBIDADES','Comorbidades'],
   ['ESPESSADA','Dieta espessada'],['CONSISTENCIA','Consistência'],['ESPESSANTE_AGUA','Espessante p/ água'],
   ['MOTIVO_SUSPENSAO','Motivo da suspensão'],['NOVA_PRESCRICAO','Nova prescrição'],
   ['MAMADEIRA','Mamadeira/bico'],['ESPESSAMENTO','Espessamento'],
   ['VIA_ORAL','Via oral'],['SUCO_MANITOL','Suco p/ manitol'],
+  ['ORIENTACAO_ALTA','Orientação na alta'],['DATA_ALTA','Data da alta'],['HORARIO_ALTA','Horário da alta'],
   ['SOLIC_FONO','Solicitações da fono'],['OBS','Observações'],
   ['ANALISE','Análise'],['MOTIVO_RECUSA','Motivo da recusa'],['JUSTIFICATIVA','Justificativa'],
   ['DIETA_ENTREGUE','Dieta entregue'],['RESPONSAVEL','Responsável'],['RESOLVIDO_EM','Resolvido em','dt'],
@@ -858,7 +900,7 @@ function relLoad(){
         '<div class="stat"><div class="v" style="color:var(--red)">'+r.recusadas+'</div><div class="l">Recusadas</div></div>'+
         '<div class="stat"><div class="v">'+r.pendentes+'</div><div class="l">Pendentes</div></div>'+
         '<div class="stat"><div class="v">'+fmtMin(r.tempoMedioMin)+'</div><div class="l">Tempo médio</div></div>'+
-        '<div class="stat"><div class="v" style="color:'+(r.conformePct>=80?'var(--pri)':'var(--amber)')+'">'+r.conformePct+'%</div><div class="l">Dentro do SLA ('+r.slaMin+' min)</div></div>'+
+        '<div class="stat"><div class="v" style="color:'+(r.conformePct>=80?'var(--pri)':'var(--amber)')+'">'+r.conformePct+'%</div><div class="l">Dentro do SLA</div></div>'+
       '</div>'+
       '<div class="pgrid" style="grid-template-columns:repeat(auto-fit,minmax(min(100%,290px),1fr))">'+
         '<div class="card pad"><h3 style="font-size:15px;margin-bottom:12px">Por tipo de solicitação</h3>'+barras(r.porTipo)+'</div>'+
@@ -876,11 +918,19 @@ function viewListas(){
   rpc('apiListas',S.token).then(function(r){
     if(!authGuard(r))return;
     LISTAS_ST=r.listas||{};
-    var h='<div class="card pad mb"><div class="row">'+
-      '<div class="field" style="margin:0"><label for="slain">SLA de entrega (minutos)</label><input id="slain" type="number" min="1" max="720" value="'+r.slaMin+'" style="width:130px"></div>'+
-      '<button class="btn sm" style="margin-top:20px" onclick="salvarSla()">Salvar SLA</button>'+
-      '<p class="muted small grow" style="min-width:220px">Solicitações atendidas acima desse tempo contam como fora do SLA nos relatórios e ficam vermelhas nos painéis.</p>'+
-    '</div></div>'+
+    var slaCli=r.slaClinicas||{};
+    var clinicas=r.listas&&r.listas.CLINICA||[];
+    var h='<div class="card pad mb">'+
+      '<h3 style="font-size:15px;margin-bottom:4px">SLA de entrega</h3>'+
+      '<p class="muted small mb">Solicitações atendidas acima do prazo contam como fora do SLA nos relatórios e ficam vermelhas nos painéis.</p>'+
+      '<div class="field" style="max-width:220px"><label for="slain">SLA padrão (minutos)</label><input id="slain" type="number" min="1" max="720" value="'+r.slaMin+'"></div>'+
+      '<p class="muted small mb"><b>SLA por clínica</b> — em branco usa o SLA padrão.</p>'+
+      '<div class="grid2">'+clinicas.map(function(c){
+        var v=slaCli[String(c).toUpperCase()]||'';
+        return '<div class="field"><label>'+esc(c)+'</label><input class="slacli" data-clinica="'+esc(c)+'" type="number" min="1" max="720" placeholder="padrão" value="'+esc(v)+'"></div>';
+      }).join('')+'</div>'+
+      '<button class="btn sm" onclick="salvarSla()">Salvar SLA</button>'+
+    '</div>'+
     '<div class="pgrid" style="grid-template-columns:repeat(auto-fit,minmax(min(100%,290px),1fr))">';
     Object.keys(LNOMES).forEach(function(t){ h+=listaCardHtml(t); });
     $('#appbody').innerHTML=h+'</div>';
@@ -891,7 +941,7 @@ function listaCardHtml(t){
   return '<div class="card pad" data-listacard="'+t+'"><h3 style="font-size:15px;margin-bottom:4px">'+LNOMES[t]+'</h3>'+
     '<p class="muted small mb">'+itens.length+' '+(itens.length===1?'item cadastrado':'itens cadastrados')+'</p>'+
     '<div class="ltags">'+(itens.length?itens.map(function(v,i){
-      return '<span class="ltag">'+esc(v)+'<button type="button" title="Remover (clique 2x para confirmar)" aria-label="Remover '+esc(v)+'" onclick="removerItemLista(\''+t+'\','+i+',this)">✕</button></span>';
+      return '<span class="ltag">'+esc(v)+'<button type="button" title="Remover" aria-label="Remover '+esc(v)+'" onclick="removerItemLista(\''+t+'\','+i+')">✕</button></span>';
     }).join(''):'<span class="muted small">Nenhum item cadastrado ainda.</span>')+'</div>'+
     '<div class="laddrow"><input class="inp" placeholder="Novo item…" data-ladd="'+t+'" onkeydown="if(event.key===\'Enter\'){event.preventDefault();adicionarItemLista(\''+t+'\')}">'+
     '<button class="btn sm" type="button" onclick="adicionarItemLista(\''+t+'\')">Adicionar</button></div></div>';
@@ -908,23 +958,19 @@ function adicionarItemLista(t){
   if(atuais.some(function(x){return x.toLowerCase()===v.toLowerCase();})){ toast('Esse item já existe na lista.',true); return; }
   salvarListaCompleta(t,atuais.concat([v.toUpperCase()]));
 }
-var LDEL_CONFIRM=null;
-function removerItemLista(t,i,btn){
-  var key=t+'|'+i;
-  if(LDEL_CONFIRM && LDEL_CONFIRM.key===key){
-    clearTimeout(LDEL_CONFIRM.to); LDEL_CONFIRM=null;
-    var novos=(LISTAS_ST[t]||[]).slice();
-    var removido=novos.splice(i,1)[0];
-    salvarListaCompleta(t,novos,function(){
-      toastAction('Item removido: "'+removido+'".','Desfazer',function(){
-        salvarListaCompleta(t,(LISTAS_ST[t]||[]).concat([removido]));
-      });
+/* Remoção imediata com opção de desfazer (6s). Substitui o antigo esquema de
+   "clicar 2x para confirmar", que reconstruía o card no meio do fluxo e às vezes
+   fazia o item removido reaparecer. */
+function removerItemLista(t,i){
+  var atual=(LISTAS_ST[t]||[]);
+  if(atual.length<=1){ toast('A lista precisa ter pelo menos um item.',true); return; }
+  var novos=atual.slice();
+  var removido=novos.splice(i,1)[0];
+  salvarListaCompleta(t,novos,function(){
+    toastAction('Item removido: "'+removido+'".','Desfazer',function(){
+      salvarListaCompleta(t,(LISTAS_ST[t]||[]).concat([removido]));
     });
-    return;
-  }
-  if(LDEL_CONFIRM) refreshListaCard(LDEL_CONFIRM.t);
-  LDEL_CONFIRM={t:t,i:i,key:key,to:setTimeout(function(){ LDEL_CONFIRM=null; refreshListaCard(t); },3000)};
-  if(btn){ btn.textContent='!'; btn.classList.add('confirm'); }
+  });
 }
 function salvarListaCompleta(t,novos,onOk){
   rpc('apiSalvarLista',S.token,t,novos).then(function(r){
@@ -964,7 +1010,12 @@ function carregarAuditoria(){
   }).catch(function(){ bodyError('#aud_list','Não foi possível carregar a auditoria.','carregarAuditoria()'); });
 }
 function salvarSla(){
-  rpc('apiSalvarSla',S.token,$('#slain').value).then(function(r){
+  var clin={};
+  $$('.slacli').forEach(function(inp){
+    var v=inp.value.trim();
+    if(v) clin[inp.dataset.clinica]=parseInt(v,10);
+  });
+  rpc('apiSalvarSla',S.token,$('#slain').value,clin).then(function(r){
     if(!r.ok){ toast(r.erro,true); return; }
     toast('SLA atualizado.');
   }).catch(function(){ toast('Falha ao salvar o SLA. Tente novamente.',true); });
@@ -1060,7 +1111,7 @@ var TVDATA=null;
 function tvLoad(){
   rpc('pubPainel').then(function(r){
     if(!r.ok)return;
-    TVDATA=r; S.slaMin=r.slaMin;
+    TVDATA=r; S.slaMin=r.slaMin; S.slaMap=r.slaClinicas||{};
     tvRender();
   }).catch(function(){});
 }
@@ -1073,7 +1124,7 @@ function tvTick(){
   $$('#v-tv [data-tick]').forEach(function(el){
     var m=elapsedMin(el.dataset.tick);
     el.textContent=fmtMin(m);
-    el.className='tempo tv-'+slaClass(m);
+    el.className='tempo tv-'+slaClass(m,el.dataset.clinica);
   });
 }
 function tvRender(){
@@ -1081,7 +1132,7 @@ function tvRender(){
   var rows = r.pendentes.length ? r.pendentes.map(function(p){
     var m=elapsedMin(p.criadoEm);
     return '<div class="tvrow '+tipoClass(p.tipo)+'">'+
-      '<div class="tempo tv-'+slaClass(m)+'" data-tick="'+esc(p.criadoEm)+'">'+fmtMin(m)+'</div>'+
+      '<div class="tempo tv-'+slaClass(m,p.clinica)+'" data-tick="'+esc(p.criadoEm)+'" data-clinica="'+esc(p.clinica)+'">'+fmtMin(m)+'</div>'+
       '<div class="grow"><b>'+esc(p.paciente)+'</b><div class="sub">'+esc(p.clinica)+' · '+esc(p.leito)+
         (p.resumo?' — '+esc(p.resumo.slice(0,70)):'')+'</div></div>'+
       tipoBadge(p.tipo)+
@@ -1097,7 +1148,7 @@ function tvRender(){
   $('#v-tv').innerHTML=
     (MODE!=='tv' ? '<button class="tvexit" onclick="exitTV()">✕ Sair do painel</button>' : '')+
     '<div class="tvwrap">'+
-      '<div class="tvhead"><h1>Solicitações de Dieta</h1><span style="color:#9fb0a6">SLA '+r.slaMin+' min</span><span class="clock" id="tvclock">'+tvClock()+'</span></div>'+
+      '<div class="tvhead"><h1>Maná — Solicitações de Dieta</h1><span style="color:#9fb0a6">SLA padrão '+r.slaMin+' min</span><span class="clock" id="tvclock">'+tvClock()+'</span></div>'+
       '<div class="tvgrid">'+
         '<div>'+rows+'</div>'+
         '<div class="tvside">'+

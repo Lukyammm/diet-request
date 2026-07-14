@@ -30,7 +30,8 @@ var SOL_HEADERS = [
   'VIA_ORAL', 'SUCO_MANITOL',
   'SOLIC_FONO', 'OBS',
   'ANALISE', 'MOTIVO_RECUSA', 'JUSTIFICATIVA', 'DIETA_ENTREGUE',
-  'RESPONSAVEL', 'RESOLVIDO_EM', 'TEMPO_MIN', 'CONFORME'
+  'RESPONSAVEL', 'RESOLVIDO_EM', 'TEMPO_MIN', 'CONFORME',
+  'ORIENTACAO_ALTA', 'DATA_ALTA', 'HORARIO_ALTA'
 ];
 
 var USU_HEADERS = ['ID', 'NOME', 'LOGIN', 'HASH', 'SALT', 'PERFIL', 'ATIVO', 'PRIMEIRO_ACESSO', 'TOKEN', 'TOKEN_EXP'];
@@ -38,11 +39,12 @@ var USU_HEADERS = ['ID', 'NOME', 'LOGIN', 'HASH', 'SALT', 'PERFIL', 'ATIVO', 'PR
 var AUD_HEADERS = ['DATA_HORA', 'USUARIO', 'LOGIN', 'ACAO', 'DETALHE'];
 
 var TIPOS = [
-  'LIBERAÇÃO DE DIETA',
+  'SOLICITAÇÃO DE DIETA',
   'SUSPENSÃO DE DIETA',
   'MUDANÇA DE PRESCRIÇÃO',
   'DIETA TESTE-FONO',
-  'PREPARO PARA EXAMES'
+  'PREPARO PARA EXAMES',
+  'AVISO DE ALTA'
 ];
 
 /* ======================= WEB APP ======================= */
@@ -52,7 +54,7 @@ function doGet(e) {
   var t = HtmlService.createTemplateFromFile('index');
   t.mode = (e && e.parameter && e.parameter.view) ? String(e.parameter.view) : '';
   return t.evaluate()
-    .setTitle('Solicitação de Dieta')
+    .setTitle('Maná')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1, maximum-scale=1')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
@@ -218,6 +220,24 @@ function slaMin_() {
   return 30;
 }
 
+/* SLA específico por clínica: guardado na aba LISTAS como TIPO='SLA_CLINICA',
+   VALOR='NOME DA CLÍNICA=MINUTOS'. Clínicas sem valor caem no SLA padrão. */
+function slaClinicas_() {
+  var arr = (listas_().SLA_CLINICA || []);
+  var out = {};
+  arr.forEach(function (s) {
+    var m = s.match(/^(.*)=\s*(\d+)\s*$/);
+    if (m) { var n = parseInt(m[2], 10); if (n > 0) out[s_(m[1]).toUpperCase()] = n; }
+  });
+  return out;
+}
+
+function slaForClinica_(clinica) {
+  var map = slaClinicas_();
+  var v = map[s_(clinica).toUpperCase()];
+  return v > 0 ? v : slaMin_();
+}
+
 function nextId_() {
   var props = PropertiesService.getScriptProperties();
   var n = parseInt(props.getProperty('SEQ') || '0', 10) + 1;
@@ -341,6 +361,7 @@ function pubCriar(o) {
     if (o.tipo === TIPOS[2]) { req('novaPrescricao', 'nova prescrição'); }
     if (o.tipo === TIPOS[3]) { req('mamadeira', 'mamadeira / bico'); }
     if (o.tipo === TIPOS[4]) { req('viaOral', 'via oral'); }
+    if (o.tipo === TIPOS[5]) { req('orientacaoAlta', 'orientação da nutrição na alta'); req('dataAlta', 'data da alta'); req('horarioAlta', 'horário da alta'); }
 
     var sucoManitol = '';
     if (o.tipo === TIPOS[4]) {
@@ -359,7 +380,8 @@ function pubCriar(o) {
         s_(o.mamadeira), s_(o.espessamento),
         s_(o.viaOral), sucoManitol,
         s_(o.solicFono), s_(o.obs),
-        '', '', '', '', '', '', '', ''
+        '', '', '', '', '', '', '', '',
+        s_(o.orientacaoAlta), s_(o.dataAlta), s_(o.horarioAlta)
       ];
       sheet_(SH.SOL).appendRow(row);
       audit_(null, 'SOLICITACAO_CRIADA', 'ID ' + id + ' — ' + s_(o.paciente).toUpperCase() + ' (' + s_(o.tipo) + ') por ' + s_(o.profissional).toUpperCase() + '.');
@@ -387,7 +409,7 @@ function pubPainel() {
       if (r.STATUS === 'ATENDIDA') stats.atendidas++;
       if (r.STATUS === 'RECUSADA') stats.recusadas++;
     }
-    var resumo = r.PRESCRICAO || r.NOVA_PRESCRICAO || r.MOTIVO_SUSPENSAO || r.MAMADEIRA || r.SUCO_MANITOL || '';
+    var resumo = r.PRESCRICAO || r.NOVA_PRESCRICAO || r.MOTIVO_SUSPENSAO || r.MAMADEIRA || r.SUCO_MANITOL || (r.DATA_ALTA ? ('Alta ' + r.DATA_ALTA) : '') || '';
     if (r.STATUS === 'PENDENTE') {
       pend.push({ id: r.ID, criadoEm: r.CRIADO_EM, tipo: r.TIPO, paciente: r.PACIENTE, clinica: r.CLINICA, leito: r.ENFERMARIA_LEITO, resumo: resumo });
     } else {
@@ -397,9 +419,28 @@ function pubPainel() {
 
   pend.sort(function (a, b) { return a.criadoEm < b.criadoEm ? -1 : 1; });
   recentes.sort(function (a, b) { return a.resolvidoEm > b.resolvidoEm ? -1 : 1; });
-  var out = { ok: true, pendentes: pend, recentes: recentes.slice(0, 8), stats: stats, slaMin: slaMin_(), agora: nowIso_() };
+  var out = { ok: true, pendentes: pend, recentes: recentes.slice(0, 8), stats: stats, slaMin: slaMin_(), slaClinicas: slaClinicas_(), agora: nowIso_() };
   cachePutJson_('painel', out, 5);
   return out;
+}
+
+/* Verifica se um prontuário teve "Aviso de Alta" registrado nos últimos 7 dias.
+   Usado na identificação para avisar antes de abrir uma nova solicitação para
+   um paciente que já recebeu alta. */
+function pubAltaRecente(prontuario) {
+  prontuario = s_(prontuario).toLowerCase();
+  if (!prontuario) return { ok: true, alta: false };
+  var limite = Date.now() - 7 * 24 * 3600 * 1000;
+  var all = rowsAsObjects_(sheet_(SH.SOL), SOL_HEADERS);
+  for (var i = all.length - 1; i >= 0; i--) {
+    var r = all[i];
+    if (r.TIPO !== 'AVISO DE ALTA') continue;
+    if (s_(r.PRONTUARIO).toLowerCase() !== prontuario) continue;
+    var d = new Date(r.CRIADO_EM).getTime();
+    if (isNaN(d) || d < limite) continue;
+    return { ok: true, alta: true, paciente: r.PACIENTE, dataAlta: r.DATA_ALTA, horarioAlta: r.HORARIO_ALTA, criadoEm: r.CRIADO_EM };
+  }
+  return { ok: true, alta: false };
 }
 
 /* ======================= OPERAÇÃO (LOGIN) ======================= */
@@ -409,7 +450,7 @@ function apiPendentes(token) {
   var pend = rowsAsObjects_(sheet_(SH.SOL), SOL_HEADERS)
     .filter(function (r) { return r.STATUS === 'PENDENTE'; })
     .sort(function (a, b) { return a.CRIADO_EM < b.CRIADO_EM ? -1 : 1; });
-  return { ok: true, itens: pend, slaMin: slaMin_(), motivosRecusa: listas_().MOTIVO_RECUSA || [] };
+  return { ok: true, itens: pend, slaMin: slaMin_(), slaClinicas: slaClinicas_(), motivosRecusa: listas_().MOTIVO_RECUSA || [] };
 }
 
 function apiResolver(token, o) {
@@ -429,7 +470,7 @@ function apiResolver(token, o) {
       if (r.STATUS !== 'PENDENTE') return { ok: false, erro: 'Esta solicitação já foi resolvida por outra pessoa.' };
       var agora = new Date();
       var tempoMin = Math.max(0, Math.round((agora.getTime() - new Date(r.CRIADO_EM).getTime()) / 60000));
-      var conforme = analise === 'ACEITA' ? (tempoMin <= slaMin_() ? 'SIM' : 'NÃO') : '';
+      var conforme = analise === 'ACEITA' ? (tempoMin <= slaForClinica_(r.CLINICA) ? 'SIM' : 'NÃO') : '';
       var status = analise === 'ACEITA' ? 'ATENDIDA' : 'RECUSADA';
       var col = function (h) { return SOL_HEADERS.indexOf(h) + 1; };
       sh.getRange(r._row, col('STATUS')).setValue(status);
@@ -603,7 +644,7 @@ var LISTAS_EDITAVEIS = ['CLINICA', 'CATEGORIA', 'MOTIVO_SUSPENSAO', 'MAMADEIRA',
 function apiListas(token) {
   if (!requireAdmin_(token)) return { ok: false, erro: 'Apenas administradores.' };
   var L = listas_();
-  var out = { ok: true, listas: {}, slaMin: slaMin_() };
+  var out = { ok: true, listas: {}, slaMin: slaMin_(), slaClinicas: slaClinicas_() };
   LISTAS_EDITAVEIS.forEach(function (t) { out.listas[t] = L[t] || []; });
   return out;
 }
@@ -646,27 +687,44 @@ function apiSalvarLista(token, tipo, valores) {
 
 var LNOMES_ = { CLINICA: 'Clínicas', CATEGORIA: 'Categorias profissionais', MOTIVO_SUSPENSAO: 'Motivos de suspensão', MAMADEIRA: 'Mamadeiras e bicos', CONSISTENCIA: 'Consistências', MOTIVO_RECUSA: 'Motivos padronizados de recusa' };
 
-function apiSalvarSla(token, minutos) {
+function apiSalvarSla(token, minutos, clinicas) {
   var adm = requireAdmin_(token);
   if (!adm) return { ok: false, erro: 'Apenas administradores.' };
   var n = parseInt(minutos, 10);
-  if (!(n > 0 && n <= 720)) return { ok: false, erro: 'Informe um SLA entre 1 e 720 minutos.' };
+  if (!(n > 0 && n <= 720)) return { ok: false, erro: 'Informe um SLA padrão entre 1 e 720 minutos.' };
+
+  /* Normaliza o mapa de clínicas: só valores válidos (1..720) entram; os demais
+     (ou em branco) são descartados e a clínica passa a usar o SLA padrão. */
+  clinicas = clinicas || {};
+  var clean = {};
+  Object.keys(clinicas).forEach(function (k) {
+    var v = parseInt(clinicas[k], 10);
+    if (v > 0 && v <= 720) clean[s_(k).toUpperCase()] = v;
+  });
 
   return withLock_(function () {
     var sh = sheet_(SH.LIS);
     var last = sh.getLastRow();
     var anterior = slaMin_();
     var rows = last >= 2 ? sh.getRange(2, 1, last - 1, 2).getValues() : [];
-    for (var i = 0; i < rows.length; i++) {
-      if (s_(rows[i][0]) === 'CONFIG' && /^SLA_MINUTOS/i.test(s_(rows[i][1]))) {
-        sh.getRange(i + 2, 2).setValue('SLA_MINUTOS=' + n);
-        audit_(adm, 'SLA_ALTERADO', 'SLA alterado de ' + anterior + ' para ' + n + ' minutos.');
-        cacheInvalidate_('listas');
-        return { ok: true };
-      }
-    }
-    sh.appendRow(['CONFIG', 'SLA_MINUTOS=' + n]);
-    audit_(adm, 'SLA_ALTERADO', 'SLA alterado de ' + anterior + ' para ' + n + ' minutos.');
+
+    /* Mantém todas as linhas que não são configuração de SLA e reescreve as de
+       SLA do zero, evitando duplicar CONFIG/SLA_CLINICA antigos. */
+    var keep = [];
+    rows.forEach(function (r) {
+      var t = s_(r[0]), v = s_(r[1]);
+      if (!t) return;
+      if (t === 'CONFIG' && /^SLA_MINUTOS/i.test(v)) return;
+      if (t === 'SLA_CLINICA') return;
+      keep.push([t, v]);
+    });
+    keep.push(['CONFIG', 'SLA_MINUTOS=' + n]);
+    Object.keys(clean).forEach(function (k) { keep.push(['SLA_CLINICA', k + '=' + clean[k]]); });
+
+    if (last >= 2) sh.getRange(2, 1, last - 1, 2).clearContent();
+    sh.getRange(2, 1, keep.length, 2).setValues(keep);
+
+    audit_(adm, 'SLA_ALTERADO', 'SLA padrão de ' + anterior + ' para ' + n + ' min; ' + Object.keys(clean).length + ' clínica(s) com SLA específico.');
     cacheInvalidate_('listas');
     return { ok: true };
   });
