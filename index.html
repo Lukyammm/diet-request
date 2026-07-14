@@ -196,6 +196,69 @@ hr.sep{border:0;border-top:1px solid var(--line);margin:16px 0}
 .bar .rail{height:9px;background:var(--paper);border-radius:99px;overflow:hidden}
 .bar .fill{height:100%;background:var(--pri);border-radius:99px}
 
+/* barra de ações do relatório */
+.rel-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end}
+.rel-actions .field{margin:0}
+.rel-actions .spacer{flex:1 1 auto}
+.btn.sm{min-height:44px;padding:9px 14px;font-size:14px}
+.btn.outline{background:#fff;color:var(--pri-d);border:1px solid var(--line)}
+.btn.outline:hover{background:var(--pri-s);border-color:var(--pri)}
+
+/* faixa de KPIs herói */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,190px),1fr));gap:12px;margin-bottom:16px}
+.kpi{position:relative;background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px 16px 14px;box-shadow:var(--sh);border-top:3px solid var(--pri)}
+.kpi.k-blue{border-top-color:var(--blue)}.kpi.k-red{border-top-color:var(--red)}
+.kpi.k-amber{border-top-color:var(--amber)}.kpi.k-purple{border-top-color:var(--purple)}.kpi.k-teal{border-top-color:var(--teal)}
+.kpi .lbl{color:var(--mut);font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase}
+.kpi .big{font-family:var(--disp);font-weight:700;font-size:clamp(26px,7vw,32px);line-height:1.05;margin-top:6px}
+.kpi .sub{color:var(--mut);font-size:12.5px;margin-top:2px}
+.trend{display:inline-flex;align-items:center;gap:3px;font-size:12.5px;font-weight:700;padding:2px 8px;border-radius:999px;margin-top:8px}
+.trend.up{background:var(--pri-s);color:var(--pri-d)}
+.trend.down{background:var(--red-s);color:var(--red)}
+.trend.flat{background:#eef1ee;color:var(--mut)}
+
+/* gauge SLA */
+.gauge{display:flex;align-items:center;gap:14px}
+.gauge .ring{--pct:0;--gc:var(--pri);position:relative;width:76px;height:76px;border-radius:50%;flex:0 0 auto;
+  background:conic-gradient(var(--gc) calc(var(--pct)*1%),var(--paper) 0);display:grid;place-items:center}
+.gauge .ring::before{content:'';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:56px;height:56px;border-radius:50%;background:#fff}
+.gauge .ring b{position:relative;z-index:1;font-family:var(--disp);font-weight:700;font-size:18px;color:var(--gc)}
+.gauge .g-meta{font-size:13px;color:var(--mut)}
+.gauge .g-meta b{color:var(--ink);font-family:var(--disp)}
+
+/* mini tabelas do relatório */
+.rtable{width:100%;border-collapse:collapse;font-size:13.5px}
+.rtable th,.rtable td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line)}
+.rtable th{color:var(--mut);font-size:11.5px;letter-spacing:.04em;text-transform:uppercase;font-weight:600}
+.rtable td.num,.rtable th.num{text-align:right;font-variant-numeric:tabular-nums}
+.rtable tr:last-child td{border-bottom:0}
+.rtable .rank{color:var(--mut);font-variant-numeric:tabular-nums;width:26px}
+.pill{display:inline-block;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:700;font-variant-numeric:tabular-nums}
+.pill.ok{background:var(--pri-s);color:var(--pri-d)}.pill.warn{background:var(--amber-s);color:var(--amber)}.pill.bad{background:var(--red-s);color:var(--red)}
+
+/* gráfico de colunas por dia da semana */
+.week{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;align-items:end;min-height:130px}
+.week .col{display:flex;flex-direction:column;align-items:center;gap:6px;height:100%;justify-content:flex-end}
+.week .col .val{font-size:12px;font-weight:700;color:var(--mut);font-variant-numeric:tabular-nums}
+.week .col .colbar{width:100%;max-width:34px;background:var(--pri-s);border:1px solid var(--pri);border-radius:6px 6px 0 0;min-height:3px;transition:height .3s}
+.week .col .day{font-size:11px;color:var(--mut);font-weight:600}
+
+/* sparkline série diária */
+.spark{width:100%;height:120px;display:block}
+.spark .area{fill:var(--pri-s);opacity:.7}
+.spark .line{fill:none;stroke:var(--pri);stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
+.spark .dot{fill:var(--pri)}
+.spark-empty{color:var(--mut);font-size:13px;padding:24px 0;text-align:center}
+
+/* cabeçalho institucional — só aparece na impressão */
+.print-only{display:none}
+.rel-head{border-bottom:2px solid var(--pri);padding-bottom:12px;margin-bottom:18px}
+.rel-head .rh-title{font-family:var(--disp);font-weight:700;font-size:20px;color:var(--pri-d)}
+.rel-head .rh-sub{color:var(--mut);font-size:13px;margin-top:2px}
+.rel-sign{grid-template-columns:1fr 1fr;gap:40px;margin-top:48px}
+.rel-sign .sig{border-top:1px solid var(--ink);padding-top:6px;text-align:center;font-size:12.5px;color:var(--mut)}
+.rel-foot{margin-top:24px;padding-top:10px;border-top:1px solid var(--line);color:var(--mut);font-size:11.5px;justify-content:space-between;gap:12px;flex-wrap:wrap}
+
 /* ---------- modal / toast ---------- */
 .overlay{position:fixed;inset:0;background:rgba(20,28,24,.45);z-index:60;display:none;align-items:flex-end;justify-content:center;padding:0}
 .overlay.open{display:flex}
@@ -261,6 +324,28 @@ body.tv{background:#0f1512;color:#e8efe9}
 /* em telas estreitas o botão fixo de sair sobrepõe o relógio do cabeçalho — reserva espaço acima */
 @media(max-width:700px){
   .tvexit ~ .tvwrap{padding-top:calc(58px + var(--sa-t))}
+}
+
+/* ---------- impressão do relatório (PDF) ---------- */
+@media print{
+  @page{size:A4;margin:14mm 12mm}
+  html,body{background:#fff!important}
+  /* esconde toda a interface, mantém só a área de impressão do relatório */
+  .topbar,.tabs,.nav,#toasts,.overlay,.rel-actions,.appfoot,.fab{display:none!important}
+  body *{visibility:hidden}
+  #relPrint,#relPrint *{visibility:visible}
+  #relPrint{position:absolute;left:0;top:0;width:100%;padding:0;margin:0}
+  .print-only{display:block!important}
+  .rel-sign.print-only{display:grid!important}
+  .rel-foot.print-only{display:flex!important}
+  .card{box-shadow:none!important;border:1px solid #cfd8d1!important;break-inside:avoid;page-break-inside:avoid}
+  .kpi,.stat{box-shadow:none!important;break-inside:avoid}
+  .kpis{grid-template-columns:repeat(4,1fr)}
+  .stats{grid-template-columns:repeat(6,1fr)}
+  .pgrid{grid-template-columns:1fr 1fr!important}
+  .trend{border:1px solid #cfd8d1}
+  .rel-sign{page-break-inside:avoid}
+  a[href]:after{content:''}
 }
 </style>
 </head>
@@ -966,42 +1051,245 @@ function histDet(i){
 }
 
 /* ---------- relatórios ---------- */
+var REL=null; /* último relatório carregado — usado por impressão e exportação */
+var MESES_PT=['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+function mesExtenso(ym){
+  var m=/^(\d{4})-(\d{2})$/.exec(ym||''); if(!m) return '—';
+  return MESES_PT[parseInt(m[2],10)-1]+' de '+m[1];
+}
 function viewRel(){
   var mes=ymNow();
   $('#appbody').innerHTML=
-    '<div class="row mb"><div class="field" style="margin:0"><label for="r_mes">Competência</label>'+
-    '<input id="r_mes" type="month" value="'+mes+'" onchange="relLoad()"></div></div><div id="relbody"></div>';
+    '<div class="rel-actions mb">'+
+      '<div class="field"><label for="r_mes">Competência</label>'+
+        '<input id="r_mes" type="month" value="'+mes+'" onchange="relLoad()"></div>'+
+      '<div class="spacer"></div>'+
+      '<button class="btn outline sm" onclick="relCSV()">⬇ Exportar CSV</button>'+
+      '<button class="btn sm" onclick="relPrint()">🖨 Imprimir / PDF</button>'+
+    '</div>'+
+    '<div id="relbody"></div>';
   relLoad();
 }
+
+/* variação percentual entre valor atual e anterior → chip de tendência.
+   modo 'pp' trata os valores como pontos percentuais (diferença simples). */
+function trendChip(atual,anterior,opt){
+  opt=opt||{};
+  if(anterior==null) return '';
+  var invert=opt.invert; // quando "menor é melhor" (ex.: tempo, recusas)
+  var diff, txt;
+  if(opt.pp){ diff=Math.round(atual-anterior); txt=(diff>0?'+':'')+diff+' p.p.'; }
+  else if(!anterior){ if(!atual) return '<span class="trend flat">—</span>'; return '<span class="trend up">novo</span>'; }
+  else { var pct=Math.round(100*(atual-anterior)/anterior); diff=pct; txt=(pct>0?'+':'')+pct+'%'; }
+  var good = invert ? diff<0 : diff>0;
+  var cls = diff===0 ? 'flat' : (good?'up':'down');
+  var arrow = diff===0 ? '→' : (diff>0?'▲':'▼');
+  return '<span class="trend '+cls+'" title="Mês anterior">'+arrow+' '+esc(txt)+'</span>';
+}
+
 function relLoad(){
   $('#relbody').innerHTML='<div class="empty"><span class="spin" style="border-color:var(--line);border-top-color:var(--pri)"></span></div>';
   rpc('apiRelatorio',S.token,$('#r_mes').value).then(function(r){
     if(!authGuard(r))return;
+    REL=r;
+    var a=r.anterior||null;
+
     function barras(obj,cor){
-      var keys=Object.keys(obj).sort(function(a,b){return obj[b]-obj[a];});
+      var keys=Object.keys(obj).sort(function(x,y){return obj[y]-obj[x];});
       if(!keys.length)return '<p class="muted small">Sem dados no período.</p>';
-      var max=obj[keys[0]];
+      var max=obj[keys[0]],tot=keys.reduce(function(s,k){return s+obj[k];},0);
       return '<div class="bars">'+keys.map(function(k){
-        return '<div class="bar"><div class="t"><span>'+esc(k)+'</span><b>'+obj[k]+'</b></div>'+
+        var pc=tot?Math.round(100*obj[k]/tot):0;
+        return '<div class="bar"><div class="t"><span>'+esc(k)+'</span><b>'+obj[k]+' · '+pc+'%</b></div>'+
           '<div class="rail"><div class="fill" style="width:'+Math.round(100*obj[k]/max)+'%;background:'+(cor||'var(--pri)')+'"></div></div></div>';
       }).join('')+'</div>';
     }
+
+    /* tabela ranking (chave → valor), com posição e % do total */
+    function tabelaRank(obj,rotulo,unidade){
+      var keys=Object.keys(obj).sort(function(x,y){return obj[y]-obj[x];}).slice(0,8);
+      if(!keys.length)return '<p class="muted small">Sem dados no período.</p>';
+      return '<table class="rtable"><thead><tr><th class="rank">#</th><th>'+esc(rotulo)+'</th><th class="num">'+esc(unidade||'Qtd')+'</th></tr></thead><tbody>'+
+        keys.map(function(k,i){return '<tr><td class="rank">'+(i+1)+'</td><td>'+esc(k)+'</td><td class="num"><b>'+obj[k]+'</b></td></tr>';}).join('')+
+        '</tbody></table>';
+    }
+
+    /* tempo médio por clínica + % dentro do SLA */
+    function tabelaClinicaSLA(){
+      var keys=Object.keys(r.tempoPorClinica||{}).sort(function(x,y){return r.tempoPorClinica[y]-r.tempoPorClinica[x];});
+      if(!keys.length)return '<p class="muted small">Nenhuma solicitação atendida no período.</p>';
+      return '<table class="rtable"><thead><tr><th>Clínica</th><th class="num">Tempo médio</th><th class="num">Dentro do SLA</th></tr></thead><tbody>'+
+        keys.map(function(k){
+          var sla=(r.slaPorClinica&&r.slaPorClinica[k]!=null)?r.slaPorClinica[k]:null;
+          var cls=sla==null?'':(sla>=80?'ok':(sla>=60?'warn':'bad'));
+          return '<tr><td>'+esc(k)+'</td><td class="num">'+fmtMin(r.tempoPorClinica[k])+'</td>'+
+            '<td class="num">'+(sla==null?'—':'<span class="pill '+cls+'">'+sla+'%</span>')+'</td></tr>';
+        }).join('')+'</tbody></table>';
+    }
+
+    /* colunas por dia da semana */
+    function semanaChart(){
+      var dias=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+      var arr=r.porDiaSemana||[0,0,0,0,0,0,0];
+      var max=Math.max.apply(null,arr.concat([1]));
+      return '<div class="week">'+arr.map(function(v,i){
+        return '<div class="col"><span class="val">'+v+'</span>'+
+          '<div class="colbar" style="height:'+Math.max(3,Math.round(100*v/max))+'%"></div>'+
+          '<span class="day">'+dias[i]+'</span></div>';
+      }).join('')+'</div>';
+    }
+
+    /* sparkline (área+linha) da série diária de solicitações */
+    function sparkline(){
+      var s=r.serieDiaria||{};
+      var dias=Object.keys(s).sort();
+      if(dias.length<2) return '<div class="spark-empty">Dados insuficientes para a curva diária.</div>';
+      var vals=dias.map(function(d){return s[d];});
+      var max=Math.max.apply(null,vals),W=600,H=110,pad=6;
+      var pts=vals.map(function(v,i){
+        var x=pad+(W-2*pad)*(dias.length===1?0:i/(dias.length-1));
+        var y=H-pad-(H-2*pad)*(max?v/max:0);
+        return [Math.round(x),Math.round(y)];
+      });
+      var line=pts.map(function(p,i){return (i?'L':'M')+p[0]+' '+p[1];}).join(' ');
+      var area='M'+pts[0][0]+' '+(H-pad)+' '+pts.map(function(p){return 'L'+p[0]+' '+p[1];}).join(' ')+' L'+pts[pts.length-1][0]+' '+(H-pad)+' Z';
+      return '<svg class="spark" viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none" role="img" aria-label="Solicitações por dia">'+
+        '<path class="area" d="'+area+'"/><path class="line" d="'+line+'"/>'+
+        pts.map(function(p){return '<circle class="dot" cx="'+p[0]+'" cy="'+p[1]+'" r="2.5"/>';}).join('')+
+        '</svg>'+
+        '<div class="muted small" style="display:flex;justify-content:space-between;margin-top:4px">'+
+          '<span>dia '+dias[0]+'</span><span>pico: '+max+'</span><span>dia '+dias[dias.length-1]+'</span></div>';
+    }
+
+    var slaCls=r.conformePct>=80?'var(--pri)':(r.conformePct>=60?'var(--amber)':'var(--red)');
+
     $('#relbody').innerHTML=
+      '<div id="relPrint">'+
+
+      /* cabeçalho institucional (só na impressão) */
+      '<div class="rel-head print-only">'+
+        '<div class="rh-title">Relatório de Solicitações de Dieta</div>'+
+        '<div class="rh-sub">Serviço de Nutrição e Dietética · Competência: '+esc(mesExtenso(r.mes))+'</div>'+
+      '</div>'+
+
+      /* KPIs herói com tendência vs mês anterior */
+      '<div class="kpis">'+
+        '<div class="kpi"><div class="lbl">Total de solicitações</div><div class="big">'+r.total+'</div>'+
+          '<div class="sub">'+r.resolvidas+' resolvidas · '+r.pendentes+' pendentes</div>'+
+          (a?trendChip(r.total,a.total):'')+'</div>'+
+        '<div class="kpi k-teal"><div class="lbl">Taxa de atendimento</div><div class="big">'+r.atendimentoPct+'%</div>'+
+          '<div class="sub">'+r.atendidas+' atendidas de '+r.total+'</div>'+
+          (a?trendChip(r.atendimentoPct,a.atendimentoPct,{pp:true}):'')+'</div>'+
+        '<div class="kpi k-amber"><div class="lbl">Tempo médio de atendimento</div><div class="big">'+fmtMin(r.tempoMedioMin)+'</div>'+
+          '<div class="sub">mediana '+fmtMin(r.tempoMedianoMin)+' · p90 '+fmtMin(r.tempoP90Min)+'</div>'+
+          (a?trendChip(r.tempoMedioMin,a.tempoMedioMin,{invert:true}):'')+'</div>'+
+        '<div class="kpi k-red"><div class="lbl">Taxa de recusa</div><div class="big">'+r.recusaPct+'%</div>'+
+          '<div class="sub">'+r.recusadas+' recusa(s)</div>'+
+          (a?trendChip(r.recusadas,a.recusadas,{invert:true}):'')+'</div>'+
+      '</div>'+
+
+      /* gauge SLA + estatísticas operacionais */
+      '<div class="pgrid mb" style="grid-template-columns:repeat(auto-fit,minmax(min(100%,290px),1fr))">'+
+        '<div class="card pad"><h3 style="font-size:15px;margin-bottom:12px">Cumprimento de SLA</h3>'+
+          '<div class="gauge"><div class="ring" style="--pct:'+r.conformePct+';--gc:'+slaCls+'"><b>'+r.conformePct+'%</b></div>'+
+          '<div class="g-meta">Meta de entrega: <b>'+r.slaMin+' min</b><br>Dentro do prazo: <b>'+(r.atendidas-r.foraSla)+'</b><br>Fora do prazo: <b style="color:var(--red)">'+r.foraSla+'</b>'+
+          (a?'<br><span style="font-size:12px">vs. mês anterior: </span>'+trendChip(r.conformePct,a.conformePct,{pp:true}):'')+'</div></div></div>'+
+        '<div class="card pad"><h3 style="font-size:15px;margin-bottom:12px">Distribuição de tempos (atendidas)</h3>'+
+          '<div class="stats" style="margin:0;grid-template-columns:repeat(2,1fr)">'+
+            '<div class="stat"><div class="v">'+fmtMin(r.tempoMinMin)+'</div><div class="l">Mais rápido</div></div>'+
+            '<div class="stat"><div class="v">'+fmtMin(r.tempoMedianoMin)+'</div><div class="l">Mediana (p50)</div></div>'+
+            '<div class="stat"><div class="v">'+fmtMin(r.tempoP90Min)+'</div><div class="l">p90</div></div>'+
+            '<div class="stat"><div class="v">'+fmtMin(r.tempoMaxMin)+'</div><div class="l">Mais lento</div></div>'+
+          '</div></div>'+
+      '</div>'+
+
+      /* estatísticas operacionais compactas */
       '<div class="stats">'+
-        '<div class="stat"><div class="v">'+r.total+'</div><div class="l">Solicitações</div></div>'+
         '<div class="stat"><div class="v" style="color:var(--pri)">'+r.atendidas+'</div><div class="l">Atendidas</div></div>'+
         '<div class="stat"><div class="v" style="color:var(--red)">'+r.recusadas+'</div><div class="l">Recusadas</div></div>'+
         '<div class="stat"><div class="v">'+r.pendentes+'</div><div class="l">Pendentes</div></div>'+
-        '<div class="stat"><div class="v">'+fmtMin(r.tempoMedioMin)+'</div><div class="l">Tempo médio</div></div>'+
-        '<div class="stat"><div class="v" style="color:'+(r.conformePct>=80?'var(--pri)':'var(--amber)')+'">'+r.conformePct+'%</div><div class="l">Dentro do SLA</div></div>'+
+        '<div class="stat"><div class="v" style="color:'+(r.foraSla?'var(--red)':'var(--pri)')+'">'+r.foraSla+'</div><div class="l">Fora do SLA</div></div>'+
+        '<div class="stat"><div class="v">'+r.isolamento+'</div><div class="l">Isolamento</div></div>'+
+        '<div class="stat"><div class="v">'+r.enteral+'</div><div class="l">Com enteral</div></div>'+
       '</div>'+
+
+      /* série diária */
+      '<div class="card pad mb"><h3 style="font-size:15px;margin-bottom:12px">Solicitações por dia da competência</h3>'+sparkline()+'</div>'+
+
+      /* gráficos por dimensão */
       '<div class="pgrid" style="grid-template-columns:repeat(auto-fit,minmax(min(100%,290px),1fr))">'+
         '<div class="card pad"><h3 style="font-size:15px;margin-bottom:12px">Por tipo de solicitação</h3>'+barras(r.porTipo)+'</div>'+
         '<div class="card pad"><h3 style="font-size:15px;margin-bottom:12px">Por clínica</h3>'+barras(r.porClinica,'var(--blue)')+'</div>'+
         '<div class="card pad"><h3 style="font-size:15px;margin-bottom:12px">Recusas por motivo</h3>'+barras(r.recusaPorMotivo,'var(--red)')+'</div>'+
         '<div class="card pad"><h3 style="font-size:15px;margin-bottom:12px">Por categoria solicitante</h3>'+barras(r.porCategoria,'var(--purple)')+'</div>'+
+        '<div class="card pad"><h3 style="font-size:15px;margin-bottom:12px">Tempo médio e SLA por clínica</h3>'+tabelaClinicaSLA()+'</div>'+
+        '<div class="card pad"><h3 style="font-size:15px;margin-bottom:12px">Produtividade por responsável</h3>'+tabelaRank(r.porResponsavel,'Responsável','Atend.')+'</div>'+
+        '<div class="card pad"><h3 style="font-size:15px;margin-bottom:12px">Volume por dia da semana</h3>'+semanaChart()+'</div>'+
+      '</div>'+
+
+      /* rodapé de impressão: assinaturas + carimbo de geração */
+      '<div class="rel-sign print-only"><div class="sig">Responsável técnico — Nutrição</div><div class="sig">Coordenação</div></div>'+
+      '<div class="rel-foot print-only"><span>Emitido por '+esc((S.user&&S.user.nome)||'—')+' em '+fmtDT(r.geradoEm)+'</span>'+
+        '<span>Sistema de Solicitação de Dietas · Competência '+esc(mesExtenso(r.mes))+'</span></div>'+
+
       '</div>';
   }).catch(function(){ bodyError('#relbody','Não foi possível carregar os relatórios.','relLoad()'); });
+}
+
+/* aciona a impressão nativa (usa o layout @media print → salvar como PDF) */
+function relPrint(){
+  if(!REL){ toast('Aguarde o relatório carregar.',true); return; }
+  window.print();
+}
+
+/* exporta o relatório atual como CSV (baixa via link com data URI) */
+function relCSV(){
+  if(!REL){ toast('Aguarde o relatório carregar.',true); return; }
+  var r=REL,linhas=[];
+  function add(sec,chave,valor){ linhas.push([sec,chave,valor]); }
+  add('Competência','Mês',r.mes||'todas');
+  add('Resumo','Total de solicitações',r.total);
+  add('Resumo','Atendidas',r.atendidas);
+  add('Resumo','Recusadas',r.recusadas);
+  add('Resumo','Pendentes',r.pendentes);
+  add('Resumo','Taxa de atendimento (%)',r.atendimentoPct);
+  add('Resumo','Taxa de recusa (%)',r.recusaPct);
+  add('SLA','Meta (min)',r.slaMin);
+  add('SLA','Dentro do SLA (%)',r.conformePct);
+  add('SLA','Fora do SLA (qtd)',r.foraSla);
+  add('Tempo','Médio (min)',r.tempoMedioMin);
+  add('Tempo','Mediana p50 (min)',r.tempoMedianoMin);
+  add('Tempo','p90 (min)',r.tempoP90Min);
+  add('Tempo','Mínimo (min)',r.tempoMinMin);
+  add('Tempo','Máximo (min)',r.tempoMaxMin);
+  add('Clínico','Isolamento',r.isolamento);
+  add('Clínico','Com dieta enteral',r.enteral);
+  function despeja(sec,obj){ Object.keys(obj||{}).sort(function(a,b){return obj[b]-obj[a];}).forEach(function(k){ add(sec,k,obj[k]); }); }
+  despeja('Por tipo',r.porTipo);
+  despeja('Por clínica',r.porClinica);
+  despeja('Por categoria',r.porCategoria);
+  despeja('Recusas por motivo',r.recusaPorMotivo);
+  despeja('Tempo médio por clínica (min)',r.tempoPorClinica);
+  despeja('SLA por clínica (%)',r.slaPorClinica);
+  despeja('Produtividade por responsável',r.porResponsavel);
+  function q(v){ v=String(v==null?'':v); return /[";\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; }
+  var csv='﻿Seção;Indicador;Valor\r\n'+linhas.map(function(l){return l.map(q).join(';');}).join('\r\n');
+  var nome='relatorio-dietas-'+(r.mes||'geral')+'.csv';
+  try{
+    var blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
+    var url=URL.createObjectURL(blob);
+    var a=document.createElement('a'); a.href=url; a.download=nome;
+    document.body.appendChild(a); a.click();
+    setTimeout(function(){ URL.revokeObjectURL(url); a.remove(); },1500);
+    toast('CSV exportado.');
+  }catch(e){
+    try{
+      var a2=document.createElement('a');
+      a2.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);
+      a2.download=nome; document.body.appendChild(a2); a2.click(); a2.remove();
+      toast('CSV exportado.');
+    }catch(e2){ toast('Não foi possível exportar o CSV neste dispositivo.',true); }
+  }
 }
 
 /* ---------- admin: listas ---------- */

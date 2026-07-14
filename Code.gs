@@ -530,35 +530,111 @@ function apiHistorico(token, f) {
   return { ok: true, itens: itens };
 }
 
+/* Mês anterior (YYYY-MM) a partir de um YYYY-MM. Vazio se a entrada for vazia. */
+function prevMonth_(mes) {
+  var m = /^(\d{4})-(\d{2})$/.exec(s_(mes));
+  if (!m) return '';
+  var y = parseInt(m[1], 10), mm = parseInt(m[2], 10) - 1;
+  if (mm < 1) { mm = 12; y--; }
+  return y + '-' + ('0' + mm).slice(-2);
+}
+
+/* Percentil (interpolado) de um array já ordenado de números. */
+function percentile_(sorted, p) {
+  if (!sorted.length) return 0;
+  if (sorted.length === 1) return sorted[0];
+  var idx = (p / 100) * (sorted.length - 1);
+  var lo = Math.floor(idx), hi = Math.ceil(idx);
+  if (lo === hi) return sorted[lo];
+  return sorted[lo] + (sorted[hi] - sorted[lo]) * (idx - lo);
+}
+
+/* Consolida os indicadores de um conjunto de solicitações de um mês. */
+function relResumo_(itens, slaPadrao, slaMap) {
+  var o = {
+    total: itens.length, pendentes: 0, atendidas: 0, recusadas: 0,
+    foraSla: 0, isolamento: 0, enteral: 0,
+    tempoMedioMin: 0, tempoMedianoMin: 0, tempoP90Min: 0, tempoMinMin: 0, tempoMaxMin: 0,
+    conformePct: 0, atendimentoPct: 0, recusaPct: 0, resolvidas: 0,
+    porTipo: {}, porClinica: {}, recusaPorMotivo: {}, porCategoria: {},
+    tempoPorClinica: {}, slaPorClinica: {}, porResponsavel: {},
+    porDiaSemana: [0, 0, 0, 0, 0, 0, 0], serieDiaria: {}
+  };
+  var tempos = [], conf = 0, confBase = 0;
+  var tpc = {}, spc = {};
+  itens.forEach(function (r) {
+    if (r.STATUS === 'PENDENTE') o.pendentes++;
+    if (r.STATUS === 'ATENDIDA') o.atendidas++;
+    if (r.STATUS === 'RECUSADA') o.recusadas++;
+    if (r.ISOLAMENTO === 'SIM') o.isolamento++;
+    if (s_(r.QTD_ENTERAL)) o.enteral++;
+    o.porTipo[r.TIPO] = (o.porTipo[r.TIPO] || 0) + 1;
+    if (r.CLINICA) o.porClinica[r.CLINICA] = (o.porClinica[r.CLINICA] || 0) + 1;
+    if (r.CATEGORIA) o.porCategoria[r.CATEGORIA] = (o.porCategoria[r.CATEGORIA] || 0) + 1;
+    if (r.STATUS === 'RECUSADA' && r.MOTIVO_RECUSA) o.recusaPorMotivo[r.MOTIVO_RECUSA] = (o.recusaPorMotivo[r.MOTIVO_RECUSA] || 0) + 1;
+
+    var d = new Date(r.CRIADO_EM);
+    if (!isNaN(d.getTime())) {
+      o.porDiaSemana[d.getDay()]++;
+      var dia = Utilities.formatDate(d, tz_(), 'dd');
+      o.serieDiaria[dia] = (o.serieDiaria[dia] || 0) + 1;
+    }
+
+    if (r.STATUS === 'ATENDIDA' && r.TEMPO_MIN !== '') {
+      var t = Number(r.TEMPO_MIN);
+      tempos.push(t); confBase++;
+      if (r.CONFORME === 'SIM') conf++; else o.foraSla++;
+      if (r.CLINICA) {
+        tpc[r.CLINICA] = tpc[r.CLINICA] || { s: 0, n: 0 };
+        tpc[r.CLINICA].s += t; tpc[r.CLINICA].n++;
+        spc[r.CLINICA] = spc[r.CLINICA] || { d: 0, b: 0 };
+        spc[r.CLINICA].b++; if (r.CONFORME === 'SIM') spc[r.CLINICA].d++;
+      }
+      if (r.RESPONSAVEL) o.porResponsavel[r.RESPONSAVEL] = (o.porResponsavel[r.RESPONSAVEL] || 0) + 1;
+    }
+  });
+
+  o.resolvidas = o.atendidas + o.recusadas;
+  if (tempos.length) {
+    tempos.sort(function (a, b) { return a - b; });
+    o.tempoMedioMin = Math.round(tempos.reduce(function (a, b) { return a + b; }, 0) / tempos.length);
+    o.tempoMedianoMin = Math.round(percentile_(tempos, 50));
+    o.tempoP90Min = Math.round(percentile_(tempos, 90));
+    o.tempoMinMin = tempos[0];
+    o.tempoMaxMin = tempos[tempos.length - 1];
+  }
+  if (confBase) o.conformePct = Math.round(100 * conf / confBase);
+  if (o.total) { o.atendimentoPct = Math.round(100 * o.atendidas / o.total); o.recusaPct = Math.round(100 * o.recusadas / o.total); }
+  Object.keys(tpc).forEach(function (k) { o.tempoPorClinica[k] = Math.round(tpc[k].s / tpc[k].n); });
+  Object.keys(spc).forEach(function (k) { o.slaPorClinica[k] = Math.round(100 * spc[k].d / spc[k].b); });
+  return o;
+}
+
 function apiRelatorio(token, mes) {
   if (!auth_(token)) return { ok: false, erro: 'Sessão expirada.' };
   mes = s_(mes);
-  var itens = rowsAsObjects_(sheet_(SH.SOL), SOL_HEADERS)
-    .filter(function (r) { return !mes || localMonth_(r.CRIADO_EM) === mes; });
+  var all = rowsAsObjects_(sheet_(SH.SOL), SOL_HEADERS);
+  var slaPadrao = slaMin_(), slaMap = slaClinicas_();
 
-  var rel = {
-    ok: true, mes: mes, total: itens.length,
-    pendentes: 0, atendidas: 0, recusadas: 0,
-    tempoMedioMin: 0, conformePct: 0,
-    porTipo: {}, porClinica: {}, recusaPorMotivo: {}, porCategoria: {}
-  };
-  var tempos = [], conf = 0, confBase = 0;
-  itens.forEach(function (r) {
-    if (r.STATUS === 'PENDENTE') rel.pendentes++;
-    if (r.STATUS === 'ATENDIDA') rel.atendidas++;
-    if (r.STATUS === 'RECUSADA') rel.recusadas++;
-    rel.porTipo[r.TIPO] = (rel.porTipo[r.TIPO] || 0) + 1;
-    if (r.CLINICA) rel.porClinica[r.CLINICA] = (rel.porClinica[r.CLINICA] || 0) + 1;
-    if (r.CATEGORIA) rel.porCategoria[r.CATEGORIA] = (rel.porCategoria[r.CATEGORIA] || 0) + 1;
-    if (r.STATUS === 'RECUSADA' && r.MOTIVO_RECUSA) rel.recusaPorMotivo[r.MOTIVO_RECUSA] = (rel.recusaPorMotivo[r.MOTIVO_RECUSA] || 0) + 1;
-    if (r.STATUS === 'ATENDIDA' && r.TEMPO_MIN !== '') {
-      tempos.push(Number(r.TEMPO_MIN)); confBase++;
-      if (r.CONFORME === 'SIM') conf++;
-    }
-  });
-  if (tempos.length) rel.tempoMedioMin = Math.round(tempos.reduce(function (a, b) { return a + b; }, 0) / tempos.length);
-  if (confBase) rel.conformePct = Math.round(100 * conf / confBase);
-  rel.slaMin = slaMin_();
+  var atuais = all.filter(function (r) { return !mes || localMonth_(r.CRIADO_EM) === mes; });
+  var rel = relResumo_(atuais, slaPadrao, slaMap);
+
+  // Comparativo com o mês anterior (só quando há competência selecionada).
+  rel.mesAnterior = prevMonth_(mes);
+  if (rel.mesAnterior) {
+    var ant = all.filter(function (r) { return localMonth_(r.CRIADO_EM) === rel.mesAnterior; });
+    var resAnt = relResumo_(ant, slaPadrao, slaMap);
+    rel.anterior = {
+      total: resAnt.total, atendidas: resAnt.atendidas, recusadas: resAnt.recusadas,
+      pendentes: resAnt.pendentes, tempoMedioMin: resAnt.tempoMedioMin, conformePct: resAnt.conformePct,
+      atendimentoPct: resAnt.atendimentoPct
+    };
+  }
+
+  rel.ok = true;
+  rel.mes = mes;
+  rel.slaMin = slaPadrao;
+  rel.geradoEm = nowIso_();
   return rel;
 }
 
