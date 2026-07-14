@@ -1001,44 +1001,59 @@ function listaCardHtml(t){
   return '<div class="card pad" data-listacard="'+t+'"><h3 style="font-size:15px;margin-bottom:4px">'+LNOMES[t]+'</h3>'+
     '<p class="muted small mb">'+itens.length+' '+(itens.length===1?'item cadastrado':'itens cadastrados')+'</p>'+
     '<div class="ltags">'+(itens.length?itens.map(function(v,i){
-      return '<span class="ltag">'+esc(v)+'<button type="button" title="Remover" aria-label="Remover '+esc(v)+'" onclick="removerItemLista(\''+t+'\','+i+')">✕</button></span>';
+      return '<span class="ltag">'+esc(v)+'<button type="button" title="Remover" aria-label="Remover '+esc(v)+'" onclick="removerItemLista(this,\''+t+'\','+i+')">✕</button></span>';
     }).join(''):'<span class="muted small">Nenhum item cadastrado ainda.</span>')+'</div>'+
-    '<div class="laddrow"><input class="inp" placeholder="Novo item…" data-ladd="'+t+'" onkeydown="if(event.key===\'Enter\'){event.preventDefault();adicionarItemLista(\''+t+'\')}">'+
-    '<button class="btn sm" type="button" onclick="adicionarItemLista(\''+t+'\')">Adicionar</button></div></div>';
+    '<div class="laddrow"><input class="inp" placeholder="Novo item…" data-ladd="'+t+'" onkeydown="if(event.key===\'Enter\'){event.preventDefault();this.nextElementSibling.click()}">'+
+    '<button class="btn sm" type="button" onclick="adicionarItemLista(this,\''+t+'\')">Adicionar</button></div></div>';
 }
 function refreshListaCard(t){
   var el=$('[data-listacard="'+t+'"]');
   if(el) el.outerHTML=listaCardHtml(t);
 }
-function adicionarItemLista(t){
+function adicionarItemLista(btn,t){
+  if(btn.disabled) return;
   var inp=$('[data-ladd="'+t+'"]');
   var v=inp.value.trim();
   if(!v) return;
   var atuais=LISTAS_ST[t]||[];
   if(atuais.some(function(x){return x.toLowerCase()===v.toLowerCase();})){ toast('Esse item já existe na lista.',true); return; }
-  salvarListaCompleta(t,atuais.concat([v.toUpperCase()]));
+  busy(btn,true,'Adicionando…');
+  inp.disabled=true;
+  salvarListaCompleta(t,atuais.concat([v.toUpperCase()]),function(){
+    toast(LNOMES[t]+' atualizada.');
+  },function(){
+    busy(btn,false);
+    inp.disabled=false;
+  });
 }
 /* Remoção imediata com opção de desfazer (6s). Substitui o antigo esquema de
    "clicar 2x para confirmar", que reconstruía o card no meio do fluxo e às vezes
-   fazia o item removido reaparecer. */
-function removerItemLista(t,i){
+   fazia o item removido reaparecer. O botão fica desabilitado com spinner durante
+   o salvamento para dar feedback imediato e evitar cliques repetidos. */
+function removerItemLista(btn,t,i){
+  if(btn.disabled) return;
   var atual=(LISTAS_ST[t]||[]);
   if(atual.length<=1){ toast('A lista precisa ter pelo menos um item.',true); return; }
   var novos=atual.slice();
   var removido=novos.splice(i,1)[0];
+  btn.disabled=true;
+  btn.innerHTML='<span class="spin" style="width:12px;height:12px;border-color:rgba(10,90,70,.25);border-top-color:var(--pri-d)"></span>';
   salvarListaCompleta(t,novos,function(){
     toastAction('Item removido: "'+removido+'".','Desfazer',function(){
       salvarListaCompleta(t,(LISTAS_ST[t]||[]).concat([removido]));
     });
+  },function(){
+    btn.disabled=false;
+    btn.innerHTML='✕';
   });
 }
-function salvarListaCompleta(t,novos,onOk){
+function salvarListaCompleta(t,novos,onOk,onErr){
   rpc('apiSalvarLista',S.token,t,novos).then(function(r){
-    if(!r.ok){ toast(r.erro,true); return; }
+    if(!r.ok){ toast(r.erro,true); if(onErr)onErr(); return; }
     LISTAS_ST[t]=novos;
     refreshListaCard(t);
     if(onOk) onOk(); else toast(LNOMES[t]+' atualizada.');
-  }).catch(function(){ toast('Falha ao salvar a lista. Tente novamente.',true); });
+  }).catch(function(){ toast('Falha ao salvar a lista. Tente novamente.',true); if(onErr)onErr(); });
 }
 
 /* ---------- admin: auditoria ---------- */
