@@ -365,6 +365,26 @@ function fmtDT(iso){
   if(isNaN(d)) return esc(iso);
   return ('0'+d.getDate()).slice(-2)+'/'+('0'+(d.getMonth()+1)).slice(-2)+' '+('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2);
 }
+/* Datas/horários vindos do backend chegam como texto "yyyy-MM-dd"/"HH:mm"
+   (o mesmo formato dos inputs date/time) — lê esse prefixo direto em vez de
+   passar por new Date(), que reinterpreta o fuso e pode mostrar dia/hora
+   errados. new Date() só entra como fallback para outros formatos. */
+function fmtData(v){
+  if(!v) return '—';
+  var m=/^(\d{4})-(\d{2})-(\d{2})/.exec(v);
+  if(m) return m[3]+'/'+m[2]+'/'+m[1];
+  var d=new Date(v);
+  if(isNaN(d)) return esc(v);
+  return ('0'+d.getDate()).slice(-2)+'/'+('0'+(d.getMonth()+1)).slice(-2)+'/'+d.getFullYear();
+}
+function fmtHora(v){
+  if(!v) return '—';
+  var m=/^(\d{2}):(\d{2})/.exec(v);
+  if(m) return m[1]+':'+m[2];
+  var d=new Date(v);
+  if(isNaN(d)) return esc(v);
+  return ('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2);
+}
 function elapsedMin(iso){ return Math.max(0,Math.floor((Date.now()-new Date(iso).getTime())/60000)); }
 function fmtMin(m){ m=Number(m)||0; if(m<60)return m+' min'; var h=Math.floor(m/60); return h+'h'+('0'+(m%60)).slice(-2); }
 function slaOf(clinica){ var m=clinica&&S.slaMap&&S.slaMap[String(clinica).toUpperCase()]; return m>0?m:(S.slaMin||30); }
@@ -528,7 +548,7 @@ function step4(){
 
 function resumo(){
   var linhas=[
-    ['Tipo',F.tipo],['Paciente',F.paciente],['Prontuário',F.prontuario],['Nascimento',F.nascimento],
+    ['Tipo',F.tipo],['Paciente',F.paciente],['Prontuário',F.prontuario],['Nascimento',F.nascimento&&fmtData(F.nascimento)],
     ['Clínica',F.clinica],['Enfermaria/leito',F.enfermariaLeito],['Isolamento',F.isolamento],
     ['Horário desejado',F.horarioPrescricao],['Tipo de dieta',F.tipoDieta],['Prescrição',F.prescricao],
     ['Comorbidades',montaComorb()],
@@ -536,7 +556,7 @@ function resumo(){
     ['Motivo da suspensão',F.motivoSuspensao],['Nova prescrição',F.novaPrescricao],
     ['Mamadeira/bico',F.mamadeira],['Espessamento',F.espessamento],
     ['Via oral',F.viaOral],['Solicitações da fono',F.solicFono],
-    ['Orientação na alta',F.orientacaoAlta],['Data da alta',F.dataAlta],['Horário da alta',F.horarioAlta],
+    ['Orientação na alta',F.orientacaoAlta],['Data da alta',F.dataAlta&&fmtData(F.dataAlta)],['Horário da alta',F.horarioAlta],
     ['Observações',F.obs||F.obsGeral]
   ].filter(function(l){return l[1];});
   return '<dl class="dl">'+linhas.map(function(l){return '<dt>'+l[0]+'</dt><dd>'+esc(l[1])+'</dd>';}).join('')+'</dl>';
@@ -643,7 +663,7 @@ function altaCheckHtml(){
     body='<span class="spin" style="width:13px;height:13px;border-color:var(--line);border-top-color:var(--pri);vertical-align:-2px;margin-right:8px"></span>Verificando avisos de alta recentes para este prontuário…';
   } else if(ALTA_CHECK&&ALTA_CHECK.status==='done'&&ALTA_CHECK.alta){
     var r=ALTA_CHECK.dados||{};
-    var quando = r.dataAlta ? ('Alta informada em '+esc(r.dataAlta)+(r.horarioAlta?' às '+esc(r.horarioAlta):'')+'.')
+    var quando = r.dataAlta ? ('Alta informada em '+fmtData(r.dataAlta)+(r.horarioAlta?' às '+fmtHora(r.horarioAlta):'')+'.')
                             : ('Aviso de alta registrado em '+fmtDT(r.criadoEm)+'.');
     body='<b>⚠ Paciente com alta recente.</b> '+esc(r.paciente||F.paciente)+' (prontuário '+esc(ALTA_CHECK.prontuario)+') recebeu um <b>Aviso de Alta</b> nos últimos 7 dias. '+quando+' Confirme se esta solicitação ainda é necessária.';
   }
@@ -832,16 +852,16 @@ function viewPend(){
 }
 
 var CAMPOS_DET=[
-  ['CRIADO_EM','Solicitado em','dt'],['PACIENTE','Paciente'],['PRONTUARIO','Prontuário'],['NASCIMENTO','Nascimento'],
+  ['CRIADO_EM','Solicitado em','dt'],['PACIENTE','Paciente'],['PRONTUARIO','Prontuário'],['NASCIMENTO','Nascimento','data'],
   ['CLINICA','Clínica'],['ENFERMARIA_LEITO','Enfermaria/leito'],['ISOLAMENTO','Isolamento'],
   ['PROFISSIONAL','Solicitante'],['CATEGORIA','Categoria'],
-  ['HORARIO_PRESCRICAO','Horário desejado'],['TIPO_DIETA','Tipo de dieta'],['PRESCRICAO','Prescrição'],
+  ['HORARIO_PRESCRICAO','Horário desejado','hora'],['TIPO_DIETA','Tipo de dieta'],['PRESCRICAO','Prescrição'],
   ['COMORBIDADES','Comorbidades'],
   ['ESPESSADA','Dieta espessada'],['CONSISTENCIA','Consistência'],['ESPESSANTE_AGUA','Espessante p/ água'],
   ['MOTIVO_SUSPENSAO','Motivo da suspensão'],['NOVA_PRESCRICAO','Nova prescrição'],
   ['MAMADEIRA','Mamadeira/bico'],['ESPESSAMENTO','Espessamento'],
   ['VIA_ORAL','Via oral'],['SUCO_MANITOL','Suco p/ manitol'],
-  ['ORIENTACAO_ALTA','Orientação na alta'],['DATA_ALTA','Data da alta'],['HORARIO_ALTA','Horário da alta'],
+  ['ORIENTACAO_ALTA','Orientação na alta'],['DATA_ALTA','Data da alta','data'],['HORARIO_ALTA','Horário da alta','hora'],
   ['SOLIC_FONO','Solicitações da fono'],['OBS','Observações'],
   ['ANALISE','Análise'],['MOTIVO_RECUSA','Motivo da recusa'],['JUSTIFICATIVA','Justificativa'],
   ['DIETA_ENTREGUE','Dieta entregue'],['RESPONSAVEL','Responsável'],['RESOLVIDO_EM','Resolvido em','dt'],
@@ -852,6 +872,8 @@ function fichaHTML(it){
   return '<dl class="dl">'+CAMPOS_DET.map(function(c){
     var v=it[c[0]]; if(!v)return '';
     if(c[2]==='dt')v=fmtDT(v);
+    if(c[2]==='data')v=fmtData(v);
+    if(c[2]==='hora')v=fmtHora(v);
     if(c[2]==='min')v=fmtMin(v);
     return '<dt>'+c[1]+'</dt><dd>'+esc(v)+'</dd>';
   }).join('')+'</dl>';

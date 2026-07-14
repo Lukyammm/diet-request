@@ -145,7 +145,24 @@ function seedAdmin_(sh) {
 function ss_() { return SpreadsheetApp.getActiveSpreadsheet(); }
 function sheet_(name) { ensureSetup_(); return ss_().getSheetByName(name); }
 function nowIso_() { return new Date().toISOString(); }
-function s_(v) { return v === null || v === undefined ? '' : String(v).trim(); }
+/* Datas/horários digitados como texto (ex.: "2026-03-04", "14:30") viram
+   células Date de verdade quando o Sheets os reconhece — e String(Date) usa
+   o toString() padrão do JS ("Wed Mar 04 2026 00:00:00 GMT-0300 (...)"),
+   que aparecia cru na tela. Convertemos de volta ao formato original antes
+   de virar string: horários (âncora 30/12/1899, época do Sheets) viram
+   "HH:mm"; datas sem hora viram "yyyy-MM-dd"; o resto vira ISO completo. */
+function s_(v) {
+  if (v === null || v === undefined) return '';
+  if (v instanceof Date) {
+    if (isNaN(v.getTime())) return '';
+    if (v.getFullYear() === 1899) return Utilities.formatDate(v, tz_(), 'HH:mm');
+    if (v.getHours() === 0 && v.getMinutes() === 0 && v.getSeconds() === 0 && v.getMilliseconds() === 0) {
+      return Utilities.formatDate(v, tz_(), 'yyyy-MM-dd');
+    }
+    return v.toISOString();
+  }
+  return String(v).trim();
+}
 
 /* Datas locais: os timestamps são gravados em UTC (ISO), mas as agregações
    "de hoje" / "do mês" precisam usar o fuso do hospital — senão, nas últimas
@@ -409,7 +426,8 @@ function pubPainel() {
       if (r.STATUS === 'ATENDIDA') stats.atendidas++;
       if (r.STATUS === 'RECUSADA') stats.recusadas++;
     }
-    var resumo = r.PRESCRICAO || r.NOVA_PRESCRICAO || r.MOTIVO_SUSPENSAO || r.MAMADEIRA || r.SUCO_MANITOL || (r.DATA_ALTA ? ('Alta ' + r.DATA_ALTA) : '') || '';
+    var dataAltaFmt = /^\d{4}-\d{2}-\d{2}$/.test(r.DATA_ALTA) ? r.DATA_ALTA.split('-').reverse().join('/') : r.DATA_ALTA;
+    var resumo = r.PRESCRICAO || r.NOVA_PRESCRICAO || r.MOTIVO_SUSPENSAO || r.MAMADEIRA || r.SUCO_MANITOL || (dataAltaFmt ? ('Alta ' + dataAltaFmt) : '') || '';
     if (r.STATUS === 'PENDENTE') {
       pend.push({ id: r.ID, criadoEm: r.CRIADO_EM, tipo: r.TIPO, paciente: r.PACIENTE, clinica: r.CLINICA, leito: r.ENFERMARIA_LEITO, resumo: resumo });
     } else {
