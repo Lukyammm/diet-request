@@ -87,6 +87,22 @@ hr.sep{border:0;border-top:1px solid var(--line);margin:16px 0}
 .field input:focus,.field select:focus,.field textarea:focus{border-color:var(--pri);outline:none;box-shadow:0 0 0 3px rgba(14,122,95,.12)}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 14px}
 @media(max-width:560px){.grid2{grid-template-columns:1fr}}
+.sla-table{width:100%;border-collapse:collapse;margin:14px 0}
+.sla-table thead{background:var(--paper);border-bottom:2px solid var(--line)}
+.sla-table th{padding:12px;text-align:left;font-weight:600;font-size:13.5px;color:var(--ink)}
+.sla-table td{padding:12px;border-bottom:1px solid var(--line)}
+.sla-table tbody tr:hover{background:var(--paper)}
+.sla-clinica-name{font-weight:500;color:var(--ink)}
+.sla-default{background:var(--paper);font-weight:500;color:var(--mut);font-size:13.5px}
+.sla-input{width:100%;max-width:120px;border:1px solid var(--line);border-radius:10px;padding:11px 12px;min-height:48px;background:#fff;transition:border-color .15s}
+.sla-input:focus{border-color:var(--pri);outline:none;box-shadow:0 0 0 3px rgba(14,122,95,.12)}
+.sla-badge{display:inline-block;background:var(--pri-s);color:var(--pri-d);padding:4px 12px;border-radius:6px;font-size:12px;font-weight:600}
+.sla-badge.empty{display:none}
+@media(max-width:720px){
+  .sla-table{font-size:13px}
+  .sla-table th,.sla-table td{padding:8px}
+  .sla-input{max-width:100px}
+}
 .seg{display:flex;gap:8px;flex-wrap:wrap}
 .seg button{border:1px solid var(--line);background:#fff;border-radius:999px;padding:8px 18px;min-height:var(--tap);font-size:14px;font-weight:500;transition:.12s}
 .seg button.on{background:var(--pri);border-color:var(--pri);color:#fff;font-weight:600}
@@ -960,11 +976,19 @@ function viewListas(){
       '<h3 style="font-size:15px;margin-bottom:4px">SLA de entrega</h3>'+
       '<p class="muted small mb">Solicitações atendidas acima do prazo contam como fora do SLA nos relatórios e ficam vermelhas nos painéis.</p>'+
       '<div class="field" style="max-width:220px"><label for="slain">SLA padrão (minutos)</label><input id="slain" type="number" min="1" max="720" value="'+r.slaMin+'"></div>'+
-      '<p class="muted small mb"><b>SLA por clínica</b> — em branco usa o SLA padrão.</p>'+
-      '<div class="grid2">'+clinicas.map(function(c){
-        var v=slaCli[String(c).toUpperCase()]||'';
-        return '<div class="field"><label>'+esc(c)+'</label><input class="slacli" data-clinica="'+esc(c)+'" type="number" min="1" max="720" placeholder="padrão" value="'+esc(v)+'"></div>';
-      }).join('')+'</div>'+
+      '<table class="sla-table">'+
+        '<thead><tr><th>Clínica</th><th>SLA Padrão</th><th>Customizado</th><th style="width:100px">Status</th></tr></thead>'+
+        '<tbody>'+clinicas.map(function(c){
+          var v=slaCli[String(c).toUpperCase()]||'';
+          var hasCustom=v?'true':'';
+          return '<tr><td class="sla-clinica-name">'+esc(c)+'</td>'+
+            '<td class="sla-default">'+r.slaMin+' min</td>'+
+            '<td><input class="sla-input slacli" data-clinica="'+esc(c)+'" type="number" min="1" max="720" placeholder="—" value="'+esc(v)+'" onchange="updateSlaStatus(this)"></td>'+
+            '<td><span class="sla-badge '+(hasCustom?'':'empty')+'" data-badge="'+esc(c)+'">Customizado</span></td>'+
+          '</tr>';
+        }).join('')+
+        '</tbody>'+
+      '</table>'+
       '<button class="btn sm" onclick="salvarSla()">Salvar SLA</button>'+
     '</div>'+
     '<div class="pgrid" style="grid-template-columns:repeat(auto-fit,minmax(min(100%,290px),1fr))">';
@@ -1044,6 +1068,16 @@ function carregarAuditoria(){
           '<td>'+esc(x.acao)+'</td><td>'+esc(x.detalhe)+'</td></tr>';
       }).join('')+'</tbody></table></div>';
   }).catch(function(){ bodyError('#aud_list','Não foi possível carregar a auditoria.','carregarAuditoria()'); });
+}
+function updateSlaStatus(inp){
+  var clinica=inp.dataset.clinica;
+  var badge=$('[data-badge="'+clinica+'"]');
+  if(!badge)return;
+  if(inp.value.trim()){
+    badge.classList.remove('empty');
+  } else {
+    badge.classList.add('empty');
+  }
 }
 function salvarSla(){
   var clin={};
