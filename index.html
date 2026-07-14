@@ -387,13 +387,14 @@ function bodyError(sel,msg,retry){
 /* ================= formulário público ================= */
 var F = {};
 var STEP = 1;
+var ALTA_CHECK = null;
 
 function goPublic(){
   if(MODE==='tv') return;
   clearTimers();
   $('#v-app').classList.add('hide');
   $('#v-pub').classList.remove('hide');
-  F={}; STEP=1; STEP_DIR=1; renderWizard();
+  F={}; STEP=1; STEP_DIR=1; ALTA_CHECK=null; renderWizard();
 }
 
 function renderWizard(){
@@ -518,7 +519,8 @@ function step3(){
 }
 
 function step4(){
-  return sel('categoria','Categoria do profissional',S.boot.categorias)+
+  return altaCheckHtml()+
+    sel('categoria','Categoria do profissional',S.boot.categorias)+
     fld('profissional','Profissional solicitante','text','placeholder="Nome completo"')+
     area('obsGeral','Observações gerais','opcional')+
     '<hr class="sep"><h3 style="font-size:15px;margin-bottom:10px">Revisão</h3>'+resumo();
@@ -608,33 +610,46 @@ function validar(){
 function advanceStep(){ STEP++; STEP_DIR=1; renderWizard(); }
 function nextStep(){
   collect(); if(!validar())return;
-  /* Ao sair da identificação, verifica se o prontuário teve alta recente e
-     avisa antes de prosseguir — exceto quando a própria solicitação é um
-     Aviso de Alta. Falha de rede não bloqueia o fluxo. */
-  if(STEP===2 && F.prontuario && F.tipo!=='AVISO DE ALTA'){
-    var btn=$('#nextbtn'); busy(btn,true,'Verificando…');
-    rpc('pubAltaRecente',F.prontuario).then(function(r){
-      busy(btn,false);
-      if(r&&r.ok&&r.alta) confirmAltaRecente(r); else advanceStep();
-    }).catch(function(){ busy(btn,false); advanceStep(); });
-    return;
-  }
+  /* Ao sair da identificação, dispara em segundo plano a checagem de alta
+     recente para o prontuário — sem bloquear a navegação. O resultado
+     aparece como aviso no passo do Solicitante, quando (e se) chegar lá. */
+  if(STEP===2 && F.prontuario && F.tipo!=='AVISO DE ALTA') iniciarChecagemAlta(F.prontuario);
+  else ALTA_CHECK=null;
   advanceStep();
 }
-function confirmAltaRecente(r){
-  var quando = r.dataAlta ? ('Alta informada em '+esc(r.dataAlta)+(r.horarioAlta?' às '+esc(r.horarioAlta):'')+'.')
-                          : ('Aviso de alta registrado em '+fmtDT(r.criadoEm)+'.');
-  openModal(
-    '<div class="mh"><h3>Paciente com alta recente</h3></div>'+
-    '<div class="mb">'+
-      '<p>O paciente <b>'+esc(r.paciente||F.paciente)+'</b> (prontuário '+esc(F.prontuario)+') recebeu um <b>Aviso de Alta</b> nos últimos 7 dias.</p>'+
-      '<p class="muted small mt">'+quando+'</p>'+
-      '<p class="mt">Tem certeza de que deseja continuar com esta solicitação?</p>'+
-    '</div>'+
-    '<div class="mf">'+
-      '<button class="btn ghost" onclick="closeModal();goPublic()">Não, encerrar</button>'+
-      '<button class="btn" onclick="closeModal();advanceStep()">Sim, continuar</button>'+
-    '</div>');
+function iniciarChecagemAlta(prontuario){
+  if(ALTA_CHECK && ALTA_CHECK.prontuario===prontuario) return;
+  var check={prontuario:prontuario, status:'loading'};
+  ALTA_CHECK=check;
+  rpc('pubAltaRecente',prontuario).then(function(r){
+    if(ALTA_CHECK!==check) return;
+    check.status='done';
+    check.alta=!!(r&&r.ok&&r.alta);
+    check.dados=r;
+    atualizarBadgeAlta();
+  }).catch(function(){
+    if(ALTA_CHECK!==check) return;
+    check.status='error';
+    atualizarBadgeAlta();
+  });
+}
+function altaCheckHtml(){
+  var body='';
+  if(ALTA_CHECK&&ALTA_CHECK.status==='loading'){
+    body='<span class="spin" style="width:13px;height:13px;border-color:var(--line);border-top-color:var(--pri);vertical-align:-2px;margin-right:8px"></span>Verificando avisos de alta recentes para este prontuário…';
+  } else if(ALTA_CHECK&&ALTA_CHECK.status==='done'&&ALTA_CHECK.alta){
+    var r=ALTA_CHECK.dados||{};
+    var quando = r.dataAlta ? ('Alta informada em '+esc(r.dataAlta)+(r.horarioAlta?' às '+esc(r.horarioAlta):'')+'.')
+                            : ('Aviso de alta registrado em '+fmtDT(r.criadoEm)+'.');
+    body='<b>⚠ Paciente com alta recente.</b> '+esc(r.paciente||F.paciente)+' (prontuário '+esc(ALTA_CHECK.prontuario)+') recebeu um <b>Aviso de Alta</b> nos últimos 7 dias. '+quando+' Confirme se esta solicitação ainda é necessária.';
+  }
+  if(!body) return '<div id="altacheck"></div>';
+  var warn=ALTA_CHECK&&ALTA_CHECK.alta;
+  return '<div id="altacheck" class="callout mb"'+(warn?' style="background:var(--amber-s);color:var(--amber);border-color:rgba(160,110,18,.25)"':'')+'>'+body+'</div>';
+}
+function atualizarBadgeAlta(){
+  var el=$('#altacheck');
+  if(el) el.outerHTML=altaCheckHtml();
 }
 function prevStep(){ collect(); STEP--; if(STEP<1)STEP=1; STEP_DIR=-1; renderWizard(); }
 
