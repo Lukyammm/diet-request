@@ -46,8 +46,8 @@ h1,h2,h3{font-family:var(--disp);line-height:1.2;letter-spacing:-.01em}
 .brand b{font-family:var(--disp);font-weight:600;font-size:17px;white-space:nowrap}
 .brand small{display:block;color:var(--mut);font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;font-weight:500}
 .top-right{margin-left:auto;display:flex;align-items:center;gap:8px}
-.trackbtn{display:flex;align-items:center;gap:7px;background:var(--card);border:1px solid var(--line);border-radius:999px;padding:8px 14px 8px 12px;min-height:var(--tap);font-size:13.5px;font-weight:600;color:var(--pri-d);transition:.15s}
-.trackbtn:hover{border-color:var(--pri);background:var(--pri-s)}
+.trackbtn{display:flex;align-items:center;gap:7px;background:var(--teal-s);border:1px solid transparent;border-radius:999px;padding:8px 14px 8px 12px;min-height:var(--tap);font-size:13.5px;font-weight:600;color:var(--teal);transition:.15s}
+.trackbtn:hover{background:var(--teal);color:#fff;box-shadow:var(--sh-lift)}
 .trackbtn svg{width:17px;height:17px;stroke-width:2.1;flex:0 0 auto}
 .trackbtn span{white-space:nowrap}
 @media(max-width:480px){.trackbtn span{display:none}.trackbtn{padding:8px;border-radius:10px}}
@@ -364,7 +364,7 @@ body.tv{background:#0f1512;color:#e8efe9}
     </a>
     <div class="top-right">
       <button class="trackbtn" id="trackbtn" title="Acompanhar chamado" aria-label="Acompanhar chamado" onclick="abrirRastreio()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.3A1.3 1.3 0 0 1 4.3 7h15.4A1.3 1.3 0 0 1 21 8.3v2A1.7 1.7 0 0 0 21 14v2a1.3 1.3 0 0 1-1.3 1.3H4.3A1.3 1.3 0 0 1 3 16v-2a1.7 1.7 0 0 0 0-3.4z"/><path d="M9.5 7.3v9.4" stroke-dasharray="2.1 2.1"/></svg>
         <span>Acompanhar chamado</span>
       </button>
       <span class="userchip" id="userchip"><span class="av" id="uav"></span><span id="unome"></span></span>
@@ -853,12 +853,12 @@ function renderRastreioResults(){
     '<div class="pgrid">'+RASTREIO.map(function(it,i){
       var badge = it.STATUS==='ATENDIDA'?'<span class="badge bok">Atendida</span>':
                   it.STATUS==='RECUSADA'?'<span class="badge blate">Recusada</span>':'<span class="badge bneutral">Pendente</span>';
-      var tempo = it.STATUS==='PENDENTE' ? fmtMin(elapsedMin(it.CRIADO_EM)) : (it.TEMPO_MIN?fmtMin(it.TEMPO_MIN):'—');
+      var tempo = it.STATUS==='PENDENTE' ? ('há '+fmtMin(elapsedMin(it.CRIADO_EM))) : (it.TEMPO_MIN?('em '+fmtMin(it.TEMPO_MIN)):'');
       return '<div class="pcard '+tipoClass(it.TIPO)+'" onclick="rastreioDet('+i+')">'+
         '<div class="top">'+tipoBadge(it.TIPO)+'<span class="id">'+esc(it.ID)+'</span></div>'+
         '<b>'+esc(it.PACIENTE)+'</b>'+
         '<div class="loc">'+esc(it.CLINICA)+' · '+esc(it.ENFERMARIA_LEITO)+'</div>'+
-        '<div class="row" style="justify-content:space-between;margin-top:6px">'+badge+'<span class="muted small">'+esc(tempo)+'</span></div>'+
+        '<div class="row" style="justify-content:space-between;margin-top:6px">'+badge+'<span class="muted small">'+esc(fmtDT(it.CRIADO_EM))+(tempo?' · '+esc(tempo):'')+'</span></div>'+
       '</div>';
     }).join('')+'</div>';
 }
