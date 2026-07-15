@@ -281,6 +281,22 @@ hr.sep{border:0;border-top:1px solid var(--line);margin:16px 0}
 .dl dt{color:var(--mut);font-size:12px;letter-spacing:.04em;text-transform:uppercase;font-weight:600;padding-top:2px}
 .dl dd{margin:0;overflow-wrap:anywhere}
 @media(max-width:480px){.dl{grid-template-columns:1fr}.dl dt{padding-top:6px}}
+
+/* ---------- ficha do chamado em formato de ticket ---------- */
+.ticket{position:relative;margin-bottom:18px}
+.ticket-top{position:relative;background:var(--pri-s);border:1.5px solid var(--line);border-bottom:2px dashed rgba(10,90,70,.32);border-radius:14px 14px 0 0;padding:18px 20px 22px}
+.ticket-top::before,.ticket-top::after{content:'';position:absolute;bottom:-12px;width:24px;height:24px;border-radius:50%;background:#fff;border:1.5px solid var(--line);z-index:2}
+.ticket-top::before{left:-13px}
+.ticket-top::after{right:-13px}
+.ticket-body{background:#fff;border:1.5px solid var(--line);border-top:0;border-radius:0 0 14px 14px;padding:20px 20px 6px}
+.tt-row{display:flex;align-items:flex-start;justify-content:space-between;gap:14px}
+.tt-pac{font-family:var(--disp);font-weight:700;font-size:18.5px;line-height:1.28;margin-top:9px;text-wrap:balance}
+.tt-meta{color:var(--pri-d);opacity:.78;font-size:12.5px;margin-top:3px}
+.tt-side{text-align:right;flex:0 0 auto}
+.tt-code{font-family:var(--mono);font-weight:700;font-size:18px;color:var(--pri-d);letter-spacing:.03em;margin-top:9px;white-space:nowrap}
+.tt-when{color:var(--pri-d);opacity:.68;font-size:11.5px;margin-top:2px;white-space:nowrap}
+@media(max-width:420px){.tt-pac{font-size:16.5px}.tt-code{font-size:16px}}
+
 #toasts{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(22px + var(--sa-b));z-index:99;display:grid;gap:8px;width:min(420px,92vw)}
 .toast{background:var(--ink);color:#fff;border-radius:12px;padding:12px 16px;font-size:14px;box-shadow:0 8px 24px rgba(0,0,0,.25);animation:up .18s ease-out}
 .toast.err{background:var(--red)}
@@ -864,8 +880,8 @@ function renderRastreioResults(){
 }
 function rastreioDet(i){
   var it=RASTREIO[i];
-  openModal('<div class="mh">'+tipoBadge(it.TIPO)+'<h3 style="font-size:16px">'+esc(it.ID)+'</h3><button class="xbtn" onclick="closeModal()">✕</button></div>'+
-    '<div class="mb">'+fichaHTML(it)+'</div>'+
+  openModal('<div class="mh"><h3>Chamado</h3><button class="xbtn" onclick="closeModal()">✕</button></div>'+
+    '<div class="mb">'+ticketHTML(it)+'</div>'+
     '<div class="mf"><button class="btn ghost" onclick="abrirRastreio()">Voltar à busca</button><button class="btn" onclick="closeModal()">Fechar</button></div>');
 }
 </script>
@@ -1032,8 +1048,9 @@ var CAMPOS_DET=[
   ['TEMPO_MIN','Tempo de atendimento','min'],['CONFORME','Dentro do SLA']
 ];
 
-function fichaHTML(it){
-  return '<dl class="dl">'+CAMPOS_DET.map(function(c){
+function fichaHTML(it,omitir){
+  omitir=omitir||[];
+  return '<dl class="dl">'+CAMPOS_DET.filter(function(c){ return omitir.indexOf(c[0])===-1; }).map(function(c){
     var v=it[c[0]]; if(!v)return '';
     if(c[2]==='dt')v=fmtDT(v);
     if(c[2]==='data')v=fmtData(v);
@@ -1043,12 +1060,37 @@ function fichaHTML(it){
   }).join('')+'</dl>';
 }
 
+/* Ficha do chamado no formato de um ticket/protocolo: talão superior com o
+   essencial (paciente, tipo, status, código, data) separado por uma linha
+   pontilhada "picotada" do corpo com os demais campos. Reaproveitado em
+   Pendências, Histórico e na busca de "Acompanhar chamado" para que o
+   chamado sempre apareça com a mesma identidade visual. */
+function ticketHTML(it){
+  var status = it.STATUS==='ATENDIDA'?'<span class="badge bok">Atendida</span>':
+               it.STATUS==='RECUSADA'?'<span class="badge blate">Recusada</span>':'<span class="badge bneutral">Pendente</span>';
+  return '<div class="ticket">'+
+    '<div class="ticket-top">'+
+      '<div class="tt-row">'+
+        '<div class="grow">'+tipoBadge(it.TIPO)+
+          '<div class="tt-pac">'+esc(it.PACIENTE)+'</div>'+
+          '<div class="tt-meta">'+esc(it.CLINICA)+' · '+esc(it.ENFERMARIA_LEITO)+'</div>'+
+        '</div>'+
+        '<div class="tt-side">'+status+
+          '<div class="tt-code">'+esc(it.ID)+'</div>'+
+          '<div class="tt-when">'+esc(fmtDT(it.CRIADO_EM))+'</div>'+
+        '</div>'+
+      '</div>'+
+    '</div>'+
+    '<div class="ticket-body">'+fichaHTML(it,['PACIENTE','CRIADO_EM'])+'</div>'+
+  '</div>';
+}
+
 function detalhe(i){
   var it=S.pend[i];
   openModal(
-    '<div class="mh">'+tipoBadge(it.TIPO)+'<h3 style="font-size:16px">'+esc(it.ID)+'</h3><button class="xbtn" onclick="closeModal()">✕</button></div>'+
-    '<div class="mb">'+fichaHTML(it)+'<hr class="sep">'+
-      '<div class="seg" id="segRes">'+
+    '<div class="mh"><h3>Chamado</h3><button class="xbtn" onclick="closeModal()">✕</button></div>'+
+    '<div class="mb">'+ticketHTML(it)+
+      '<div class="seg mt" id="segRes">'+
         '<button type="button" data-v="ACEITA">Aceitar e entregar</button>'+
         '<button type="button" data-v="RECUSADA">Recusar</button>'+
       '</div>'+
@@ -1124,8 +1166,8 @@ function histLoad(){
 }
 function histDet(i){
   var it=HIST[i];
-  openModal('<div class="mh">'+tipoBadge(it.TIPO)+'<h3 style="font-size:16px">'+esc(it.ID)+'</h3><button class="xbtn" onclick="closeModal()">✕</button></div>'+
-    '<div class="mb">'+fichaHTML(it)+'</div>'+
+  openModal('<div class="mh"><h3>Chamado</h3><button class="xbtn" onclick="closeModal()">✕</button></div>'+
+    '<div class="mb">'+ticketHTML(it)+'</div>'+
     '<div class="mf"><button class="btn ghost" onclick="closeModal()">Fechar</button></div>');
 }
 
