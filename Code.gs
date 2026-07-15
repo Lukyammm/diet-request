@@ -44,7 +44,7 @@ var TIPOS = [
   'MUDANÇA DE PRESCRIÇÃO',
   'DIETA TESTE-FONO',
   'PREPARO PARA EXAMES',
-  'AVISO DE ALTA'
+  'AVISO DE ALTA/TRANSFERÊNCIA'
 ];
 
 /* ======================= WEB APP ======================= */
@@ -452,7 +452,7 @@ function pubAltaRecente(prontuario) {
   var all = rowsAsObjects_(sheet_(SH.SOL), SOL_HEADERS);
   for (var i = all.length - 1; i >= 0; i--) {
     var r = all[i];
-    if (r.TIPO !== 'AVISO DE ALTA') continue;
+    if (r.TIPO !== TIPOS[5]) continue;
     if (s_(r.PRONTUARIO).toLowerCase() !== prontuario) continue;
     var d = new Date(r.CRIADO_EM).getTime();
     if (isNaN(d) || d < limite) continue;
