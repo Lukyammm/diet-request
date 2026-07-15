@@ -381,7 +381,7 @@ body.tv{background:#0f1512;color:#e8efe9}
 /* ================= núcleo ================= */
 var MODE = '<?= mode ?>';
 var S = { token:null, user:null, boot:null, tab:'pend', pend:[], motivosRecusa:[], slaMin:30, slaMap:{}, timers:[] };
-var TIPOS = ['SOLICITAÇÃO DE DIETA','SUSPENSÃO DE DIETA','MUDANÇA DE PRESCRIÇÃO','DIETA TESTE-FONO','PREPARO PARA EXAMES','AVISO DE ALTA'];
+var TIPOS = ['SOLICITAÇÃO DE DIETA','SUSPENSÃO DE DIETA','MUDANÇA DE PRESCRIÇÃO','DIETA TESTE-FONO','PREPARO PARA EXAMES','AVISO DE ALTA/TRANSFERÊNCIA'];
 var TIPO_DESC = [
   'Início ou retorno da dieta (oral, enteral ou mista) conforme prescrição médica.',
   'Interromper a dieta em curso: vômito, perda de sonda, exame, cirurgia, alta…',
@@ -391,7 +391,7 @@ var TIPO_DESC = [
   'Sinaliza à nutrição que o paciente recebeu alta hospitalar.'
 ];
 /* Subtítulos curtos exibidos nos cards de seleção do tipo. */
-var TIPO_SUB = ['Início ou retorno da dieta','Interromper a dieta em curso','Prescrição foi alterada','Teste da fonoaudiologia','Manitol · suco de laranja','Paciente recebeu alta'];
+var TIPO_SUB = ['Início ou retorno da dieta','Interromper a dieta em curso','Prescrição foi alterada','Teste da fonoaudiologia','Manitol · suco de laranja','Paciente recebeu alta ou foi transferido da clínica'];
 /* Ícones de linha (um por tipo), tintados pela cor do tipo via CSS. */
 var TIPO_ICON = [
   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M4 3v7a2 2 0 0 0 2 2h0a2 2 0 0 0 2-2V3"/><path d="M6 12v9"/><path d="M18 3c-1.7 0-3 2-3 5s.6 4 2 4v9"/><path d="M17 3v6"/></svg>',
@@ -442,7 +442,7 @@ function clearTimers(){ S.timers.forEach(clearInterval); S.timers=[]; }
 
 function tipoIdx(t){ var i=TIPOS.indexOf(t); return i<0?0:i; }
 function tipoClass(t){ return 't'+(tipoIdx(t)+1); }
-function tipoBadge(t){ var i=tipoIdx(t); var nm=['Solicitação','Suspensão','Mudança','Teste-fono','Preparo exame','Aviso de alta'][i]; return '<span class="badge b'+(i+1)+'">'+nm+'</span>'; }
+function tipoBadge(t){ var i=tipoIdx(t); var nm=['Solicitação','Suspensão','Mudança','Teste-fono','Preparo exame','Aviso de alta/transferência'][i]; return '<span class="badge b'+(i+1)+'">'+nm+'</span>'; }
 
 function fmtDT(iso){
   if(!iso) return '—';
