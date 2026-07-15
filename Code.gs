@@ -31,7 +31,7 @@ var SOL_HEADERS = [
   'SOLIC_FONO', 'OBS',
   'ANALISE', 'MOTIVO_RECUSA', 'JUSTIFICATIVA', 'DIETA_ENTREGUE',
   'RESPONSAVEL', 'RESOLVIDO_EM', 'TEMPO_MIN', 'CONFORME',
-  'ORIENTACAO_ALTA', 'DATA_ALTA', 'HORARIO_ALTA'
+  'ORIENTACAO_ALTA', 'DATA_ALTA', 'HORARIO_ALTA', 'CLINICA_DESTINO', 'LEITO_DESTINO'
 ];
 
 var USU_HEADERS = ['ID', 'NOME', 'LOGIN', 'HASH', 'SALT', 'PERFIL', 'ATIVO', 'PRIMEIRO_ACESSO', 'TOKEN', 'TOKEN_EXP'];
@@ -378,7 +378,7 @@ function pubCriar(o) {
     if (o.tipo === TIPOS[2]) { req('novaPrescricao', 'nova prescrição'); }
     if (o.tipo === TIPOS[3]) { req('mamadeira', 'mamadeira / bico'); }
     if (o.tipo === TIPOS[4]) { req('viaOral', 'via oral'); }
-    if (o.tipo === TIPOS[5]) { req('orientacaoAlta', 'orientação da nutrição na alta'); req('dataAlta', 'data da alta'); req('horarioAlta', 'horário da alta'); }
+    if (o.tipo === TIPOS[5]) { req('orientacaoAlta', 'orientação da nutrição na alta'); req('clinicaDestino', 'clínica de destino'); req('leitoDestino', 'leito de destino'); req('dataAlta', 'data da alta'); req('horarioAlta', 'horário da alta'); }
 
     var sucoManitol = '';
     if (o.tipo === TIPOS[4]) {
@@ -398,7 +398,7 @@ function pubCriar(o) {
         s_(o.viaOral), sucoManitol,
         s_(o.solicFono), s_(o.obs),
         '', '', '', '', '', '', '', '',
-        s_(o.orientacaoAlta), s_(o.dataAlta), s_(o.horarioAlta)
+        s_(o.orientacaoAlta), s_(o.dataAlta), s_(o.horarioAlta), s_(o.clinicaDestino), s_(o.leitoDestino)
       ];
       sheet_(SH.SOL).appendRow(row);
       audit_(null, 'SOLICITACAO_CRIADA', 'ID ' + id + ' — ' + s_(o.paciente).toUpperCase() + ' (' + s_(o.tipo) + ') por ' + s_(o.profissional).toUpperCase() + '.');
@@ -459,6 +459,25 @@ function pubAltaRecente(prontuario) {
     return { ok: true, alta: true, paciente: r.PACIENTE, dataAlta: r.DATA_ALTA, horarioAlta: r.HORARIO_ALTA, criadoEm: r.CRIADO_EM };
   }
   return { ok: true, alta: false };
+}
+
+/* Busca livre de chamados — usada pelo botão "Acompanhar chamado", acessível
+   sem login para que quem abriu a solicitação (equipe assistencial) possa
+   consultar o andamento pelo prontuário do paciente, pelo código do chamado
+   (ex.: SD-0123) ou pelo nome do profissional solicitante. */
+function pubRastrear(q) {
+  q = s_(q).trim();
+  if (!q) return { ok: false, erro: 'Informe um termo de busca.' };
+  if (q.length < 2) return { ok: false, erro: 'Digite ao menos 2 caracteres.' };
+  var termo = q.toLowerCase();
+  var itens = rowsAsObjects_(sheet_(SH.SOL), SOL_HEADERS)
+    .filter(function (r) {
+      var alvo = (r.ID + ' ' + r.PRONTUARIO + ' ' + r.PROFISSIONAL + ' ' + r.PACIENTE).toLowerCase();
+      return alvo.indexOf(termo) > -1;
+    })
+    .sort(function (a, b) { return a.CRIADO_EM < b.CRIADO_EM ? 1 : -1; })
+    .slice(0, 60);
+  return { ok: true, itens: itens };
 }
 
 /* ======================= OPERAÇÃO (LOGIN) ======================= */

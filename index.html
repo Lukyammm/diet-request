@@ -46,6 +46,11 @@ h1,h2,h3{font-family:var(--disp);line-height:1.2;letter-spacing:-.01em}
 .brand b{font-family:var(--disp);font-weight:600;font-size:17px;white-space:nowrap}
 .brand small{display:block;color:var(--mut);font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;font-weight:500}
 .top-right{margin-left:auto;display:flex;align-items:center;gap:8px}
+.trackbtn{display:flex;align-items:center;gap:7px;background:var(--card);border:1px solid var(--line);border-radius:999px;padding:8px 14px 8px 12px;min-height:var(--tap);font-size:13.5px;font-weight:600;color:var(--pri-d);transition:.15s}
+.trackbtn:hover{border-color:var(--pri);background:var(--pri-s)}
+.trackbtn svg{width:17px;height:17px;stroke-width:2.1;flex:0 0 auto}
+.trackbtn span{white-space:nowrap}
+@media(max-width:480px){.trackbtn span{display:none}.trackbtn{padding:8px;border-radius:10px}}
 .userchip{display:none;align-items:center;gap:8px;background:var(--card);border:1px solid var(--line);border-radius:999px;padding:5px 12px 5px 6px;font-size:13px}
 .userchip .av{width:24px;height:24px;border-radius:50%;background:var(--pri-s);color:var(--pri-d);display:grid;place-items:center;font-weight:600;font-size:12px}
 .lockbtn{background:none;border:0;padding:8px;border-radius:10px;color:var(--mut);opacity:.55;display:grid;place-items:center;transition:.15s;min-width:var(--tap);min-height:var(--tap)}
@@ -358,6 +363,10 @@ body.tv{background:#0f1512;color:#e8efe9}
       <span><b>NutriSim</b><small>Serviço de Nutrição</small></span>
     </a>
     <div class="top-right">
+      <button class="trackbtn" id="trackbtn" title="Acompanhar chamado" aria-label="Acompanhar chamado" onclick="abrirRastreio()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+        <span>Acompanhar chamado</span>
+      </button>
       <span class="userchip" id="userchip"><span class="av" id="uav"></span><span id="unome"></span></span>
       <button class="lockbtn" id="lockbtn" title="Acesso restrito" aria-label="Acesso restrito" onclick="onLock()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
@@ -542,7 +551,7 @@ function step1(){
 /* Campos específicos de cada tipo: são limpos ao trocar o tipo para não
    "vazar" um valor antigo (ex.: prescrição de uma SOLICITAÇÃO) para o registro
    de outro tipo, já que o servidor grava todos os campos enviados. */
-var CAMPOS_TIPO=['horarioPrescricao','tipoDieta','prescricao','comorb','comorbOutras','espessada','consistencia','espessanteAgua','motivoSuspensao','novaPrescricao','mamadeira','espessamento','viaOral','solicFono','obs','orientacaoAlta','dataAlta','horarioAlta'];
+var CAMPOS_TIPO=['horarioPrescricao','tipoDieta','prescricao','comorb','comorbOutras','espessada','consistencia','espessanteAgua','motivoSuspensao','novaPrescricao','mamadeira','espessamento','viaOral','solicFono','obs','orientacaoAlta','dataAlta','horarioAlta','clinicaDestino','leitoDestino'];
 function pickTipo(i){
   var novo=TIPOS[i];
   if(F.tipo && F.tipo!==novo) CAMPOS_TIPO.forEach(function(k){ delete F[k]; });
@@ -617,6 +626,8 @@ function step3(){
   }
   if(t===5){
     h+=seg('orientacaoAlta','Precisa de orientação da nutrição na alta?',['SIM','NÃO'])+
+       sel('clinicaDestino','Clínica de destino (transferência)',S.boot.clinicas)+
+       fld('leitoDestino','Leito de destino','text','placeholder="Ex.: ENF 2 — LEITO 5"','opcional')+
        '<div class="grid2">'+fld('dataAlta','Data da alta','date')+fld('horarioAlta','Horário da alta','time')+'</div>'+
        area('obs','Observações','opcional');
   }
@@ -642,6 +653,7 @@ function resumo(){
     ['Mamadeira/bico',F.mamadeira],['Espessamento',F.espessamento],
     ['Via oral',F.viaOral],['Solicitações da fono',F.solicFono],
     ['Orientação na alta',F.orientacaoAlta],['Data da alta',F.dataAlta&&fmtData(F.dataAlta)],['Horário da alta',F.horarioAlta],
+    ['Clínica de destino',F.clinicaDestino],['Leito de destino',F.leitoDestino],
     ['Observações',F.obs||F.obsGeral]
   ].filter(function(l){return l[1];});
   return '<dl class="dl">'+linhas.map(function(l){return '<dt>'+l[0]+'</dt><dd>'+esc(l[1])+'</dd>';}).join('')+'</dl>';
@@ -703,7 +715,7 @@ function validar(){
     if(t===2) need=[['novaPrescricao','nova prescrição']];
     if(t===3) need=[['mamadeira','mamadeira / bico']];
     if(t===4) need=[['viaOral','via oral (sim ou não)']];
-    if(t===5) need=[['orientacaoAlta','se precisa de orientação na alta'],['dataAlta','data da alta'],['horarioAlta','horário da alta']];
+    if(t===5) need=[['orientacaoAlta','se precisa de orientação na alta'],['clinicaDestino','clínica de destino'],['leitoDestino','leito de destino'],['dataAlta','data da alta'],['horarioAlta','horário da alta']];
   }
   if(STEP===4) need=[['categoria','categoria do profissional'],['profissional','nome do profissional']];
   for(var i=0;i<need.length;i++){
@@ -774,7 +786,8 @@ function enviar(){
     motivoSuspensao:F.motivoSuspensao, novaPrescricao:F.novaPrescricao,
     mamadeira:F.mamadeira, espessamento:F.espessamento,
     viaOral:F.viaOral, solicFono:F.solicFono, obs:F.obs||F.obsGeral,
-    orientacaoAlta:F.orientacaoAlta, dataAlta:F.dataAlta, horarioAlta:F.horarioAlta
+    orientacaoAlta:F.orientacaoAlta, dataAlta:F.dataAlta, horarioAlta:F.horarioAlta,
+    clinicaDestino:F.clinicaDestino, leitoDestino:F.leitoDestino
   };
   busy($('#sendbtn'),true);
   rpc('pubCriar',payload).then(function(r){
@@ -789,6 +802,71 @@ function enviar(){
       '</div>';
     window.scrollTo({top:0});
   }).catch(function(){ busy($('#sendbtn'),false); toast('Falha de conexão. Tente novamente.',true); });
+}
+
+/* ================= acompanhar chamado ================= */
+/* Busca livre (prontuário, código SD-xxxx ou profissional solicitante),
+   acessível a qualquer momento pelo botão fixo da barra superior — não
+   depende de login nem do passo em que o wizard público está. Guarda a
+   última busca em memória para permitir "Voltar à busca" a partir da ficha
+   sem repetir a chamada ao servidor. */
+var RQ='';
+var RASTREIO=[];
+function abrirRastreio(){
+  openModal(
+    '<div class="mh"><h3>Acompanhar chamado</h3><button class="xbtn" onclick="closeModal()">✕</button></div>'+
+    '<div class="mb">'+
+      '<p class="muted small mb">Digite o <b>prontuário do paciente</b>, o <b>código do chamado</b> (ex.: SD-0123) ou o <b>profissional solicitante</b>.</p>'+
+      '<div class="row" style="gap:8px;align-items:flex-start;flex-wrap:nowrap">'+
+        '<div class="field grow" style="margin:0"><input id="rq" placeholder="Prontuário, código ou profissional…"></div>'+
+        '<button class="btn" id="rgo" style="flex:0 0 auto">Buscar</button>'+
+      '</div>'+
+      '<div id="rresult" class="mt"></div>'+
+    '</div>'+
+    '<div class="mf"><button class="btn ghost" onclick="closeModal()">Fechar</button></div>');
+  $('#rq').value=RQ;
+  $('#rq').onkeydown=function(e){ if(e.key==='Enter'){ e.preventDefault(); rastreioBuscar(); } };
+  $('#rgo').onclick=rastreioBuscar;
+  if(RASTREIO.length) renderRastreioResults();
+  setTimeout(function(){ $('#rq').focus(); $('#rq').select(); },50);
+}
+function rastreioBuscar(){
+  var q=$('#rq').value.trim();
+  if(!q){ toast('Digite um prontuário, código ou nome para buscar.',true); return; }
+  RQ=q;
+  $('#rresult').innerHTML='<div class="empty"><span class="spin" style="border-color:var(--line);border-top-color:var(--pri)"></span></div>';
+  busy($('#rgo'),true,'Buscando…');
+  rpc('pubRastrear',q).then(function(r){
+    busy($('#rgo'),false);
+    if(!r.ok){ $('#rresult').innerHTML=''; toast(r.erro||'Não foi possível buscar.',true); return; }
+    RASTREIO=r.itens;
+    renderRastreioResults();
+  }).catch(function(){ busy($('#rgo'),false); toast('Falha de conexão. Tente novamente.',true); });
+}
+function renderRastreioResults(){
+  var el=$('#rresult'); if(!el) return;
+  if(!RASTREIO.length){
+    el.innerHTML='<div class="empty"><b>Nada encontrado</b>Confira o prontuário, código ou nome informado.</div>';
+    return;
+  }
+  el.innerHTML=(RASTREIO.length>1?'<p class="muted small mb">'+RASTREIO.length+' chamados encontrados — mais recente primeiro.</p>':'')+
+    '<div class="pgrid">'+RASTREIO.map(function(it,i){
+      var badge = it.STATUS==='ATENDIDA'?'<span class="badge bok">Atendida</span>':
+                  it.STATUS==='RECUSADA'?'<span class="badge blate">Recusada</span>':'<span class="badge bneutral">Pendente</span>';
+      var tempo = it.STATUS==='PENDENTE' ? fmtMin(elapsedMin(it.CRIADO_EM)) : (it.TEMPO_MIN?fmtMin(it.TEMPO_MIN):'—');
+      return '<div class="pcard '+tipoClass(it.TIPO)+'" onclick="rastreioDet('+i+')">'+
+        '<div class="top">'+tipoBadge(it.TIPO)+'<span class="id">'+esc(it.ID)+'</span></div>'+
+        '<b>'+esc(it.PACIENTE)+'</b>'+
+        '<div class="loc">'+esc(it.CLINICA)+' · '+esc(it.ENFERMARIA_LEITO)+'</div>'+
+        '<div class="row" style="justify-content:space-between;margin-top:6px">'+badge+'<span class="muted small">'+esc(tempo)+'</span></div>'+
+      '</div>';
+    }).join('')+'</div>';
+}
+function rastreioDet(i){
+  var it=RASTREIO[i];
+  openModal('<div class="mh">'+tipoBadge(it.TIPO)+'<h3 style="font-size:16px">'+esc(it.ID)+'</h3><button class="xbtn" onclick="closeModal()">✕</button></div>'+
+    '<div class="mb">'+fichaHTML(it)+'</div>'+
+    '<div class="mf"><button class="btn ghost" onclick="abrirRastreio()">Voltar à busca</button><button class="btn" onclick="closeModal()">Fechar</button></div>');
 }
 </script>
 <script>
@@ -947,6 +1025,7 @@ var CAMPOS_DET=[
   ['MAMADEIRA','Mamadeira/bico'],['ESPESSAMENTO','Espessamento'],
   ['VIA_ORAL','Via oral'],['SUCO_MANITOL','Suco p/ manitol'],
   ['ORIENTACAO_ALTA','Orientação na alta'],['DATA_ALTA','Data da alta','data'],['HORARIO_ALTA','Horário da alta','hora'],
+  ['CLINICA_DESTINO','Clínica de destino'],['LEITO_DESTINO','Leito de destino'],
   ['SOLIC_FONO','Solicitações da fono'],['OBS','Observações'],
   ['ANALISE','Análise'],['MOTIVO_RECUSA','Motivo da recusa'],['JUSTIFICATIVA','Justificativa'],
   ['DIETA_ENTREGUE','Dieta entregue'],['RESPONSAVEL','Responsável'],['RESOLVIDO_EM','Resolvido em','dt'],
