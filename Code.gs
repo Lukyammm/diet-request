@@ -378,7 +378,7 @@ function pubCriar(o) {
     if (o.tipo === TIPOS[2]) { req('novaPrescricao', 'nova prescrição'); }
     if (o.tipo === TIPOS[3]) { req('mamadeira', 'mamadeira / bico'); }
     if (o.tipo === TIPOS[4]) { req('viaOral', 'via oral'); }
-    if (o.tipo === TIPOS[5]) { req('orientacaoAlta', 'orientação da nutrição na alta'); req('dataAlta', 'data da alta'); req('horarioAlta', 'horário da alta'); }
+    if (o.tipo === TIPOS[5]) { req('orientacaoAlta', 'orientação da nutrição na alta'); req('clinicaDestino', 'clínica de destino'); req('leitoDestino', 'leito de destino'); req('dataAlta', 'data da alta'); req('horarioAlta', 'horário da alta'); }
 
     var sucoManitol = '';
     if (o.tipo === TIPOS[4]) {
