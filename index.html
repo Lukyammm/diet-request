@@ -283,8 +283,13 @@ hr.sep{border:0;border-top:1px solid var(--line);margin:16px 0}
 @media(max-width:480px){.dl{grid-template-columns:1fr}.dl dt{padding-top:6px}}
 
 /* ---------- ficha do chamado em formato de ticket ---------- */
-.ticket{position:relative;margin-bottom:18px}
-.ticket-top{position:relative;background:var(--pri-s);border:1.5px solid var(--line);border-bottom:2px dashed rgba(10,90,70,.32);border-radius:14px 14px 0 0;padding:18px 20px 22px}
+/* Talão vertical: o ingresso clássico tem o canhoto à esquerda, cortado por
+   uma linha picotada vertical com dois furos (topo/base). Aqui o mesmo corte
+   gira 90° — o canhoto fica em cima, cortado por uma linha picotada
+   horizontal com os furos nas laterais — mantendo a leitura de "ticket" no
+   formato vertical do modal. */
+.ticket{position:relative;margin-bottom:18px;border-radius:14px;box-shadow:0 2px 10px rgba(29,42,36,.07)}
+.ticket-top{position:relative;background:var(--pri-s);border:1.5px solid var(--line);border-bottom:2px dashed rgba(10,90,70,.32);border-radius:14px 14px 0 0;padding:18px 20px 22px;overflow:hidden}
 .ticket-top::before,.ticket-top::after{content:'';position:absolute;bottom:-12px;width:24px;height:24px;border-radius:50%;background:#fff;border:1.5px solid var(--line);z-index:2}
 .ticket-top::before{left:-13px}
 .ticket-top::after{right:-13px}
@@ -293,9 +298,12 @@ hr.sep{border:0;border-top:1px solid var(--line);margin:16px 0}
 .tt-pac{font-family:var(--disp);font-weight:700;font-size:18.5px;line-height:1.28;margin-top:9px;text-wrap:balance}
 .tt-meta{color:var(--pri-d);opacity:.78;font-size:12.5px;margin-top:3px}
 .tt-side{text-align:right;flex:0 0 auto}
-.tt-code{font-family:var(--mono);font-weight:700;font-size:18px;color:var(--pri-d);letter-spacing:.03em;margin-top:9px;white-space:nowrap}
-.tt-when{color:var(--pri-d);opacity:.68;font-size:11.5px;margin-top:2px;white-space:nowrap}
-@media(max-width:420px){.tt-pac{font-size:16.5px}.tt-code{font-size:16px}}
+.tt-eyebrow{font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--pri-d);opacity:.6;font-weight:700;margin-top:10px}
+.tt-code{font-family:var(--mono);font-weight:800;font-size:21px;color:var(--pri-d);letter-spacing:.04em;white-space:nowrap;line-height:1.3}
+.tt-when{color:var(--pri-d);opacity:.68;font-size:11.5px;margin-top:1px;white-space:nowrap}
+.tt-barcode{width:84px;height:22px;margin:8px 0 2px auto;opacity:.4;
+  background-image:repeating-linear-gradient(90deg,var(--pri-d) 0 1px,transparent 1px 3px,var(--pri-d) 3px 4px,transparent 4px 5px,var(--pri-d) 5px 7px,transparent 7px 9px,var(--pri-d) 9px 10px,transparent 10px 13px);}
+@media(max-width:420px){.tt-pac{font-size:16.5px}.tt-code{font-size:18px}.tt-barcode{width:64px}}
 
 #toasts{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(22px + var(--sa-b));z-index:99;display:grid;gap:8px;width:min(420px,92vw)}
 .toast{background:var(--ink);color:#fff;border-radius:12px;padding:12px 16px;font-size:14px;box-shadow:0 8px 24px rgba(0,0,0,.25);animation:up .18s ease-out}
@@ -1076,8 +1084,10 @@ function ticketHTML(it){
           '<div class="tt-meta">'+esc(it.CLINICA)+' · '+esc(it.ENFERMARIA_LEITO)+'</div>'+
         '</div>'+
         '<div class="tt-side">'+status+
+          '<div class="tt-eyebrow">Nº do chamado</div>'+
           '<div class="tt-code">'+esc(it.ID)+'</div>'+
           '<div class="tt-when">'+esc(fmtDT(it.CRIADO_EM))+'</div>'+
+          '<div class="tt-barcode" aria-hidden="true"></div>'+
         '</div>'+
       '</div>'+
     '</div>'+
