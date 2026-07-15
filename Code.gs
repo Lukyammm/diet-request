@@ -461,6 +461,25 @@ function pubAltaRecente(prontuario) {
   return { ok: true, alta: false };
 }
 
+/* Busca livre de chamados — usada pelo botão "Acompanhar chamado", acessível
+   sem login para que quem abriu a solicitação (equipe assistencial) possa
+   consultar o andamento pelo prontuário do paciente, pelo código do chamado
+   (ex.: SD-0123) ou pelo nome do profissional solicitante. */
+function pubRastrear(q) {
+  q = s_(q).trim();
+  if (!q) return { ok: false, erro: 'Informe um termo de busca.' };
+  if (q.length < 2) return { ok: false, erro: 'Digite ao menos 2 caracteres.' };
+  var termo = q.toLowerCase();
+  var itens = rowsAsObjects_(sheet_(SH.SOL), SOL_HEADERS)
+    .filter(function (r) {
+      var alvo = (r.ID + ' ' + r.PRONTUARIO + ' ' + r.PROFISSIONAL + ' ' + r.PACIENTE).toLowerCase();
+      return alvo.indexOf(termo) > -1;
+    })
+    .sort(function (a, b) { return a.CRIADO_EM < b.CRIADO_EM ? 1 : -1; })
+    .slice(0, 60);
+  return { ok: true, itens: itens };
+}
+
 /* ======================= OPERAÇÃO (LOGIN) ======================= */
 
 function apiPendentes(token) {
