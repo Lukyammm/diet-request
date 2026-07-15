@@ -551,7 +551,7 @@ function step1(){
 /* Campos específicos de cada tipo: são limpos ao trocar o tipo para não
    "vazar" um valor antigo (ex.: prescrição de uma SOLICITAÇÃO) para o registro
    de outro tipo, já que o servidor grava todos os campos enviados. */
-var CAMPOS_TIPO=['horarioPrescricao','tipoDieta','prescricao','comorb','comorbOutras','espessada','consistencia','espessanteAgua','motivoSuspensao','novaPrescricao','mamadeira','espessamento','viaOral','solicFono','obs','orientacaoAlta','dataAlta','horarioAlta'];
+var CAMPOS_TIPO=['horarioPrescricao','tipoDieta','prescricao','comorb','comorbOutras','espessada','consistencia','espessanteAgua','motivoSuspensao','novaPrescricao','mamadeira','espessamento','viaOral','solicFono','obs','orientacaoAlta','dataAlta','horarioAlta','clinicaDestino','leitoDestino'];
 function pickTipo(i){
   var novo=TIPOS[i];
   if(F.tipo && F.tipo!==novo) CAMPOS_TIPO.forEach(function(k){ delete F[k]; });
@@ -626,6 +626,8 @@ function step3(){
   }
   if(t===5){
     h+=seg('orientacaoAlta','Precisa de orientação da nutrição na alta?',['SIM','NÃO'])+
+       sel('clinicaDestino','Clínica de destino (transferência)',S.boot.clinicas)+
+       fld('leitoDestino','Leito de destino','text','placeholder="Ex.: ENF 2 — LEITO 5"','opcional')+
        '<div class="grid2">'+fld('dataAlta','Data da alta','date')+fld('horarioAlta','Horário da alta','time')+'</div>'+
        area('obs','Observações','opcional');
   }
@@ -651,6 +653,7 @@ function resumo(){
     ['Mamadeira/bico',F.mamadeira],['Espessamento',F.espessamento],
     ['Via oral',F.viaOral],['Solicitações da fono',F.solicFono],
     ['Orientação na alta',F.orientacaoAlta],['Data da alta',F.dataAlta&&fmtData(F.dataAlta)],['Horário da alta',F.horarioAlta],
+    ['Clínica de destino',F.clinicaDestino],['Leito de destino',F.leitoDestino],
     ['Observações',F.obs||F.obsGeral]
   ].filter(function(l){return l[1];});
   return '<dl class="dl">'+linhas.map(function(l){return '<dt>'+l[0]+'</dt><dd>'+esc(l[1])+'</dd>';}).join('')+'</dl>';
@@ -712,7 +715,7 @@ function validar(){
     if(t===2) need=[['novaPrescricao','nova prescrição']];
     if(t===3) need=[['mamadeira','mamadeira / bico']];
     if(t===4) need=[['viaOral','via oral (sim ou não)']];
-    if(t===5) need=[['orientacaoAlta','se precisa de orientação na alta'],['dataAlta','data da alta'],['horarioAlta','horário da alta']];
+    if(t===5) need=[['orientacaoAlta','se precisa de orientação na alta'],['clinicaDestino','clínica de destino'],['leitoDestino','leito de destino'],['dataAlta','data da alta'],['horarioAlta','horário da alta']];
   }
   if(STEP===4) need=[['categoria','categoria do profissional'],['profissional','nome do profissional']];
   for(var i=0;i<need.length;i++){
@@ -783,7 +786,8 @@ function enviar(){
     motivoSuspensao:F.motivoSuspensao, novaPrescricao:F.novaPrescricao,
     mamadeira:F.mamadeira, espessamento:F.espessamento,
     viaOral:F.viaOral, solicFono:F.solicFono, obs:F.obs||F.obsGeral,
-    orientacaoAlta:F.orientacaoAlta, dataAlta:F.dataAlta, horarioAlta:F.horarioAlta
+    orientacaoAlta:F.orientacaoAlta, dataAlta:F.dataAlta, horarioAlta:F.horarioAlta,
+    clinicaDestino:F.clinicaDestino, leitoDestino:F.leitoDestino
   };
   busy($('#sendbtn'),true);
   rpc('pubCriar',payload).then(function(r){
@@ -1021,6 +1025,7 @@ var CAMPOS_DET=[
   ['MAMADEIRA','Mamadeira/bico'],['ESPESSAMENTO','Espessamento'],
   ['VIA_ORAL','Via oral'],['SUCO_MANITOL','Suco p/ manitol'],
   ['ORIENTACAO_ALTA','Orientação na alta'],['DATA_ALTA','Data da alta','data'],['HORARIO_ALTA','Horário da alta','hora'],
+  ['CLINICA_DESTINO','Clínica de destino'],['LEITO_DESTINO','Leito de destino'],
   ['SOLIC_FONO','Solicitações da fono'],['OBS','Observações'],
   ['ANALISE','Análise'],['MOTIVO_RECUSA','Motivo da recusa'],['JUSTIFICATIVA','Justificativa'],
   ['DIETA_ENTREGUE','Dieta entregue'],['RESPONSAVEL','Responsável'],['RESOLVIDO_EM','Resolvido em','dt'],

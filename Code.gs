@@ -31,7 +31,7 @@ var SOL_HEADERS = [
   'SOLIC_FONO', 'OBS',
   'ANALISE', 'MOTIVO_RECUSA', 'JUSTIFICATIVA', 'DIETA_ENTREGUE',
   'RESPONSAVEL', 'RESOLVIDO_EM', 'TEMPO_MIN', 'CONFORME',
-  'ORIENTACAO_ALTA', 'DATA_ALTA', 'HORARIO_ALTA'
+  'ORIENTACAO_ALTA', 'DATA_ALTA', 'HORARIO_ALTA', 'CLINICA_DESTINO', 'LEITO_DESTINO'
 ];
 
 var USU_HEADERS = ['ID', 'NOME', 'LOGIN', 'HASH', 'SALT', 'PERFIL', 'ATIVO', 'PRIMEIRO_ACESSO', 'TOKEN', 'TOKEN_EXP'];
@@ -398,7 +398,7 @@ function pubCriar(o) {
         s_(o.viaOral), sucoManitol,
         s_(o.solicFono), s_(o.obs),
         '', '', '', '', '', '', '', '',
-        s_(o.orientacaoAlta), s_(o.dataAlta), s_(o.horarioAlta)
+        s_(o.orientacaoAlta), s_(o.dataAlta), s_(o.horarioAlta), s_(o.clinicaDestino), s_(o.leitoDestino)
       ];
       sheet_(SH.SOL).appendRow(row);
       audit_(null, 'SOLICITACAO_CRIADA', 'ID ' + id + ' — ' + s_(o.paciente).toUpperCase() + ' (' + s_(o.tipo) + ') por ' + s_(o.profissional).toUpperCase() + '.');
